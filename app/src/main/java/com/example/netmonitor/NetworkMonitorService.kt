@@ -16,6 +16,7 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.example.netmonitor.engine.DeviceStatsProvider
+import com.example.netmonitor.engine.FpsProvider
 import com.example.netmonitor.engine.PingExecutor
 import com.example.netmonitor.engine.TrafficCalculator
 import com.example.netmonitor.model.MonitorConfig
@@ -67,6 +68,7 @@ class NetworkMonitorService : Service() {
 
     private lateinit var trafficCalculator: TrafficCalculator
     private lateinit var deviceStatsProvider: DeviceStatsProvider
+    private lateinit var fpsProvider: FpsProvider
     private lateinit var floatingWindowManager: FloatingWindowManager
 
     @Volatile
@@ -104,6 +106,7 @@ class NetworkMonitorService : Service() {
         currentConfig = MonitorConfig.load(this)
         trafficCalculator = TrafficCalculator()
         deviceStatsProvider = DeviceStatsProvider(this)
+        fpsProvider = FpsProvider(this)
         floatingWindowManager = FloatingWindowManager(this)
 
         startForegroundServiceInternal()
@@ -155,7 +158,7 @@ class NetworkMonitorService : Service() {
 
         val notification: Notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("System & Network Monitor Aktif")
-            .setContentText("Memantau kecepatan data, latensi, RAM, dan suhu perangkat.")
+            .setContentText("Memantau kecepatan data, latensi, FPS/Hz, RAM, dan suhu perangkat.")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
@@ -241,6 +244,11 @@ class NetworkMonitorService : Service() {
                     upSpeed = "0 B/s"
                 }
 
+                // Komputasi FPS / Refresh Rate (hanya jika aktif)
+                val fpsText = if (config.showFps) {
+                    fpsProvider.getFrameMetric()
+                } else ""
+
                 // Komputasi RAM (hanya jika aktif)
                 val ramPercent = if (config.showRam) {
                     deviceStatsProvider.getRamUsagePercent()
@@ -257,6 +265,7 @@ class NetworkMonitorService : Service() {
                         downSpeed = downSpeed,
                         upSpeed = upSpeed,
                         pingMs = latestPingMs,
+                        fpsText = fpsText,
                         ramPercent = ramPercent,
                         tempTenths = tempTenths
                     )

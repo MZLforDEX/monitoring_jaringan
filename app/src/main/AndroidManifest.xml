@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- 1. Izin Pemantauan Lalu Lintas Jaringan -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -16,6 +17,11 @@
 
     <!-- 5. Izin Menampilkan Notifikasi Foreground Service Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- 6. Izin Opsional DUMP untuk True Game FPS via ADB / Shizuku -->
+    <uses-permission
+        android:name="android.permission.DUMP"
+        tools:ignore="ProtectedPermissions" />
 
     <application
         android:allowBackup="false"

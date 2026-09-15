@@ -68,7 +68,26 @@
         android:layout_marginEnd="8dp"
         android:background="#33FFFFFF" />
 
-    <!-- 4. Indikator Penggunaan RAM -->
+    <!-- 4. Indikator Frame Rate / Refresh Rate (FPS / Hz) -->
+    <TextView
+        android:id="@+id/tvFps"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:includeFontPadding="false"
+        android:text="-- Hz"
+        android:textColor="#FFD54F"
+        android:textSize="11sp"
+        android:fontFamily="sans-serif-medium" />
+
+    <View
+        android:id="@+id/sepFps"
+        android:layout_width="1dp"
+        android:layout_height="10dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:background="#33FFFFFF" />
+
+    <!-- 5. Indikator Penggunaan RAM -->
     <TextView
         android:id="@+id/tvRam"
         android:layout_width="wrap_content"

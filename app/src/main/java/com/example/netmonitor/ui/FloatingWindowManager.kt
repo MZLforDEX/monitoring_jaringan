@@ -38,6 +38,7 @@ class FloatingWindowManager(private val context: Context) {
     private var tvDownload: TextView? = null
     private var tvUpload: TextView? = null
     private var tvPing: TextView? = null
+    private var tvFps: TextView? = null
     private var tvRam: TextView? = null
     private var tvTemp: TextView? = null
 
@@ -45,6 +46,7 @@ class FloatingWindowManager(private val context: Context) {
     private var sepDownload: View? = null
     private var sepUpload: View? = null
     private var sepPing: View? = null
+    private var sepFps: View? = null
     private var sepRam: View? = null
 
     private var isViewAttached: Boolean = false
@@ -55,6 +57,7 @@ class FloatingWindowManager(private val context: Context) {
     private var lastDownText: String = ""
     private var lastUpText: String = ""
     private var lastPingText: String = ""
+    private var lastFpsText: String = ""
     private var lastRamText: String = ""
     private var lastTempText: String = ""
 
@@ -90,12 +93,14 @@ class FloatingWindowManager(private val context: Context) {
         tvDownload = view.findViewById(R.id.tvDownload)
         tvUpload = view.findViewById(R.id.tvUpload)
         tvPing = view.findViewById(R.id.tvPing)
+        tvFps = view.findViewById(R.id.tvFps)
         tvRam = view.findViewById(R.id.tvRam)
         tvTemp = view.findViewById(R.id.tvTemp)
 
         sepDownload = view.findViewById(R.id.sepDownload)
         sepUpload = view.findViewById(R.id.sepUpload)
         sepPing = view.findViewById(R.id.sepPing)
+        sepFps = view.findViewById(R.id.sepFps)
         sepRam = view.findViewById(R.id.sepRam)
 
         applyConfigInternal(currentConfig)
@@ -136,17 +141,21 @@ class FloatingWindowManager(private val context: Context) {
         tvDownload?.visibility = if (config.showDownload) View.VISIBLE else View.GONE
         tvUpload?.visibility = if (config.showUpload) View.VISIBLE else View.GONE
         tvPing?.visibility = if (config.showPing) View.VISIBLE else View.GONE
+        tvFps?.visibility = if (config.showFps) View.VISIBLE else View.GONE
         tvRam?.visibility = if (config.showRam) View.VISIBLE else View.GONE
         tvTemp?.visibility = if (config.showTemp) View.VISIBLE else View.GONE
 
-        val hasAfterDown = config.showUpload || config.showPing || config.showRam || config.showTemp
+        val hasAfterDown = config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp
         sepDownload?.visibility = if (config.showDownload && hasAfterDown) View.VISIBLE else View.GONE
 
-        val hasAfterUp = config.showPing || config.showRam || config.showTemp
+        val hasAfterUp = config.showPing || config.showFps || config.showRam || config.showTemp
         sepUpload?.visibility = if (config.showUpload && hasAfterUp) View.VISIBLE else View.GONE
 
-        val hasAfterPing = config.showRam || config.showTemp
+        val hasAfterPing = config.showFps || config.showRam || config.showTemp
         sepPing?.visibility = if (config.showPing && hasAfterPing) View.VISIBLE else View.GONE
+
+        val hasAfterFps = config.showRam || config.showTemp
+        sepFps?.visibility = if (config.showFps && hasAfterFps) View.VISIBLE else View.GONE
 
         val hasAfterRam = config.showTemp
         sepRam?.visibility = if (config.showRam && hasAfterRam) View.VISIBLE else View.GONE
@@ -180,16 +189,19 @@ class FloatingWindowManager(private val context: Context) {
                 tvDownload = null
                 tvUpload = null
                 tvPing = null
+                tvFps = null
                 tvRam = null
                 tvTemp = null
                 sepDownload = null
                 sepUpload = null
                 sepPing = null
+                sepFps = null
                 sepRam = null
                 isViewAttached = false
                 lastDownText = ""
                 lastUpText = ""
                 lastPingText = ""
+                lastFpsText = ""
                 lastRamText = ""
                 lastTempText = ""
             }
@@ -256,6 +268,7 @@ class FloatingWindowManager(private val context: Context) {
         downSpeed: String,
         upSpeed: String,
         pingMs: Int,
+        fpsText: String,
         ramPercent: Int,
         tempTenths: Int
     ) {
@@ -290,7 +303,15 @@ class FloatingWindowManager(private val context: Context) {
                     }
                 }
 
-                // 4. RAM
+                // 4. FPS / Hz
+                if (currentConfig.showFps) {
+                    if (lastFpsText != fpsText) {
+                        tvFps?.text = fpsText
+                        lastFpsText = fpsText
+                    }
+                }
+
+                // 5. RAM
                 if (currentConfig.showRam) {
                     val newRamText = "RAM ${ramPercent}%"
                     if (lastRamText != newRamText) {
@@ -299,7 +320,7 @@ class FloatingWindowManager(private val context: Context) {
                     }
                 }
 
-                // 5. Suhu
+                // 6. Suhu
                 if (currentConfig.showTemp) {
                     val newTempText = if (tempTenths > 0) "${tempTenths / 10}.${tempTenths % 10}°C" else "--°C"
                     if (lastTempText != newTempText) {

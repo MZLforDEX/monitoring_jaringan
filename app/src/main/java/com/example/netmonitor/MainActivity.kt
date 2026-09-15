@@ -1,6 +1,9 @@
 package com.example.netmonitor
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -16,6 +19,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import com.example.netmonitor.engine.FpsProvider
 import com.example.netmonitor.model.MonitorConfig
 
 /**
@@ -37,8 +41,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var cbDownload: CheckBox
     private lateinit var cbUpload: CheckBox
     private lateinit var cbPing: CheckBox
+    private lateinit var cbFps: CheckBox
     private lateinit var cbRam: CheckBox
     private lateinit var cbTemp: CheckBox
+
+    // Status FPS & ADB Command View
+    private lateinit var tvFpsStatus: TextView
+    private lateinit var tvAdbCommand: TextView
+    private lateinit var fpsProvider: FpsProvider
 
     // 1. Launcher modern untuk izin overlay (SYSTEM_ALERT_WINDOW)
     private val overlayPermissionLauncher: ActivityResultLauncher<Intent> =
@@ -88,8 +98,13 @@ class MainActivity : ComponentActivity() {
         cbDownload = findViewById(R.id.cbDownload)
         cbUpload = findViewById(R.id.cbUpload)
         cbPing = findViewById(R.id.cbPing)
+        cbFps = findViewById(R.id.cbFps)
         cbRam = findViewById(R.id.cbRam)
         cbTemp = findViewById(R.id.cbTemp)
+
+        tvFpsStatus = findViewById(R.id.tvFpsStatus)
+        tvAdbCommand = findViewById(R.id.tvAdbCommand)
+        fpsProvider = FpsProvider(this)
     }
 
     /**
@@ -100,6 +115,7 @@ class MainActivity : ComponentActivity() {
         cbDownload.isChecked = config.showDownload
         cbUpload.isChecked = config.showUpload
         cbPing.isChecked = config.showPing
+        cbFps.isChecked = config.showFps
         cbRam.isChecked = config.showRam
         cbTemp.isChecked = config.showTemp
     }
@@ -117,6 +133,13 @@ class MainActivity : ComponentActivity() {
             handleToggleService()
         }
 
+        tvAdbCommand.setOnClickListener {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val clip = ClipData.newPlainText("ADB Command", tvAdbCommand.text)
+            clipboard?.setPrimaryClip(clip)
+            Toast.makeText(this, "Perintah ADB berhasil disalin ke clipboard!", Toast.LENGTH_SHORT).show()
+        }
+
         // Listener untuk pembaruan kustomisasi metrik secara instan
         val configChangeListener = {
             saveAndApplyConfig()
@@ -125,6 +148,7 @@ class MainActivity : ComponentActivity() {
         cbDownload.setOnCheckedChangeListener { _, _ -> configChangeListener() }
         cbUpload.setOnCheckedChangeListener { _, _ -> configChangeListener() }
         cbPing.setOnCheckedChangeListener { _, _ -> configChangeListener() }
+        cbFps.setOnCheckedChangeListener { _, _ -> configChangeListener() }
         cbRam.setOnCheckedChangeListener { _, _ -> configChangeListener() }
         cbTemp.setOnCheckedChangeListener { _, _ -> configChangeListener() }
     }
@@ -137,6 +161,7 @@ class MainActivity : ComponentActivity() {
             showDownload = cbDownload.isChecked,
             showUpload = cbUpload.isChecked,
             showPing = cbPing.isChecked,
+            showFps = cbFps.isChecked,
             showRam = cbRam.isChecked,
             showTemp = cbTemp.isChecked
         )
@@ -244,6 +269,15 @@ class MainActivity : ComponentActivity() {
 
             btnToggleService.text = "Mulai Monitor"
             btnToggleService.setBackgroundResource(R.drawable.bg_button_start)
+        }
+
+        // Status Mode FPS / Refresh Rate
+        if (fpsProvider.isDumpPermissionGranted()) {
+            tvFpsStatus.text = "Mode Aktif: True Game FPS (SurfaceFlinger Latency)"
+            tvFpsStatus.setTextColor(0xFF81C784.toInt())
+        } else {
+            tvFpsStatus.text = "Mode Aktif: Display Refresh Rate (Hz)"
+            tvFpsStatus.setTextColor(0xFFFFD54F.toInt())
         }
     }
 }
