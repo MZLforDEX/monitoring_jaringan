@@ -12,6 +12,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
 import com.example.netmonitor.R
+import com.example.netmonitor.model.MonitorConfig
 
 /**
  * Pengelola Floating Window Overlay native berbasis WindowManager.
@@ -20,9 +21,9 @@ import com.example.netmonitor.R
  * 1. Native WindowManager murni tanpa dependensi library eksternal.
  * 2. Menggunakan TYPE_APPLICATION_OVERLAY dan FLAG_NOT_FOCUSABLE agar interaksi di luar
  *    widget (termasuk keyboard virtual dan gesture sistem) tetap berfungsi penuh.
- * 3. Drag-and-drop mulus berbasis delta event.rawX / event.rawY.
- * 4. Proteksi state lengkap untuk mencegah IllegalStateException / IllegalArgumentException (crash view already added/not attached).
- * 5. Deadband UI update: Menghindari relayout / measure pass jika teks tidak mengalami perubahan.
+ * 3. Drag-and-drop mulus berbasis delta event.rawX / event.rawY dengan proteksi mikro-pergerakan.
+ * 4. Modular Metrics & Clean Separator Logic: Tampilan item dan garis pembatas beradaptasi otomatis.
+ * 5. Deadband UI update: Menghindari relayout / measure pass jika nilai metrik tidak berubah.
  */
 class FloatingWindowManager(private val context: Context) {
 
@@ -32,16 +33,30 @@ class FloatingWindowManager(private val context: Context) {
     private val mainHandler: Handler = Handler(Looper.getMainLooper())
 
     private var floatingView: View? = null
+
+    // View metrik teks
     private var tvDownload: TextView? = null
     private var tvUpload: TextView? = null
     private var tvPing: TextView? = null
+    private var tvRam: TextView? = null
+    private var tvTemp: TextView? = null
+
+    // View garis pemisah (separators)
+    private var sepDownload: View? = null
+    private var sepUpload: View? = null
+    private var sepPing: View? = null
+    private var sepRam: View? = null
 
     private var isViewAttached: Boolean = false
+
+    private var currentConfig: MonitorConfig = MonitorConfig.load(context)
 
     // Cache teks terakhir guna mencegah pemanggilan setText dan measure pass yang redundan
     private var lastDownText: String = ""
     private var lastUpText: String = ""
     private var lastPingText: String = ""
+    private var lastRamText: String = ""
+    private var lastTempText: String = ""
 
     private val layoutParams: WindowManager.LayoutParams = WindowManager.LayoutParams().apply {
         type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -57,9 +72,8 @@ class FloatingWindowManager(private val context: Context) {
 
     /**
      * Menampilkan floating window di atas layar aplikasi lain.
-     * Melakukan pengecekan izin SYSTEM_ALERT_WINDOW dan status view saat ini.
      *
-     * @return True jika view berhasil ditampilkan, False jika tidak ada izin atau sudah terpasang.
+     * @return True jika view berhasil ditampilkan, False jika tidak ada izin atau gagal.
      */
     fun show(): Boolean {
         if (!Settings.canDrawOverlays(context)) {
@@ -76,7 +90,15 @@ class FloatingWindowManager(private val context: Context) {
         tvDownload = view.findViewById(R.id.tvDownload)
         tvUpload = view.findViewById(R.id.tvUpload)
         tvPing = view.findViewById(R.id.tvPing)
+        tvRam = view.findViewById(R.id.tvRam)
+        tvTemp = view.findViewById(R.id.tvTemp)
 
+        sepDownload = view.findViewById(R.id.sepDownload)
+        sepUpload = view.findViewById(R.id.sepUpload)
+        sepPing = view.findViewById(R.id.sepPing)
+        sepRam = view.findViewById(R.id.sepRam)
+
+        applyConfigInternal(currentConfig)
         setupTouchListener(view)
 
         try {
@@ -84,7 +106,7 @@ class FloatingWindowManager(private val context: Context) {
             floatingView = view
             isViewAttached = true
             return true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             isViewAttached = false
             floatingView = null
             return false
@@ -92,14 +114,53 @@ class FloatingWindowManager(private val context: Context) {
     }
 
     /**
-     * Menyembunyikan dan membersihkan referensi floating window secara aman.
+     * Memperbarui konfigurasi metrik apa saja yang ditampilkan.
+     */
+    fun applyConfig(config: MonitorConfig) {
+        currentConfig = config
+        val updateAction = {
+            applyConfigInternal(config)
+        }
+
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            updateAction()
+        } else {
+            mainHandler.post(updateAction)
+        }
+    }
+
+    /**
+     * Mengatur visibilitas TextView dan separator secara proporsional.
+     */
+    private fun applyConfigInternal(config: MonitorConfig) {
+        tvDownload?.visibility = if (config.showDownload) View.VISIBLE else View.GONE
+        tvUpload?.visibility = if (config.showUpload) View.VISIBLE else View.GONE
+        tvPing?.visibility = if (config.showPing) View.VISIBLE else View.GONE
+        tvRam?.visibility = if (config.showRam) View.VISIBLE else View.GONE
+        tvTemp?.visibility = if (config.showTemp) View.VISIBLE else View.GONE
+
+        val hasAfterDown = config.showUpload || config.showPing || config.showRam || config.showTemp
+        sepDownload?.visibility = if (config.showDownload && hasAfterDown) View.VISIBLE else View.GONE
+
+        val hasAfterUp = config.showPing || config.showRam || config.showTemp
+        sepUpload?.visibility = if (config.showUpload && hasAfterUp) View.VISIBLE else View.GONE
+
+        val hasAfterPing = config.showRam || config.showTemp
+        sepPing?.visibility = if (config.showPing && hasAfterPing) View.VISIBLE else View.GONE
+
+        val hasAfterRam = config.showTemp
+        sepRam?.visibility = if (config.showRam && hasAfterRam) View.VISIBLE else View.GONE
+    }
+
+    /**
+     * Menyembunyikan dan membersihkan referensi floating window.
      */
     fun hide() {
         destroy()
     }
 
     /**
-     * Menghapus view dari WindowManager dan membersihkan referensi untuk mencegah kebocoran memori (memory leak).
+     * Menghapus view dari WindowManager dan membersihkan referensi untuk mencegah kebocoran memori.
      */
     fun destroy() {
         mainHandler.removeCallbacksAndMessages(null)
@@ -110,7 +171,7 @@ class FloatingWindowManager(private val context: Context) {
                     windowManager.removeView(view)
                 }
             } catch (_: IllegalArgumentException) {
-                // View mungkin sudah dilepas oleh sistem atau belum ter-attach sempurna
+                // Supresi jika view sudah terlepas
             } catch (_: Exception) {
                 // Pengaman umum pelepasan view
             } finally {
@@ -119,10 +180,18 @@ class FloatingWindowManager(private val context: Context) {
                 tvDownload = null
                 tvUpload = null
                 tvPing = null
+                tvRam = null
+                tvTemp = null
+                sepDownload = null
+                sepUpload = null
+                sepPing = null
+                sepRam = null
                 isViewAttached = false
                 lastDownText = ""
                 lastUpText = ""
                 lastPingText = ""
+                lastRamText = ""
+                lastTempText = ""
             }
         }
     }
@@ -157,7 +226,7 @@ class FloatingWindowManager(private val context: Context) {
                         val newX = initialX + deltaX
                         val newY = initialY + deltaY
 
-                        // Hindari updateViewLayout jika posisi pixel tidak berubah (mencegah IPC flooding pada 90/120Hz)
+                        // Hindari updateViewLayout jika posisi pixel tidak berubah
                         if (newX != layoutParams.x || newY != layoutParams.y) {
                             layoutParams.x = newX
                             layoutParams.y = newY
@@ -180,36 +249,63 @@ class FloatingWindowManager(private val context: Context) {
     }
 
     /**
-     * Memperbarui metrik kecepatan jaringan dan latensi pada widget.
-     * Mengeksekusi langsung jika sudah berada di Main Thread untuk mengeliminasi alokasi Runnable berulang.
-     *
-     * @param downSpeed Kecepatan unduh terformat (contoh: "1.2 MB/s").
-     * @param upSpeed Kecepatan unggah terformat (contoh: "450 KB/s").
-     * @param pingMs Nilai latensi dalam milidetik (-1 jika koneksi terputus/gagal).
+     * Memperbarui seluruh metrik performa dan jaringan pada floating widget.
+     * Menggunakan deadband update agar terhindar dari siklus render berlebih.
      */
-    fun updateData(downSpeed: String, upSpeed: String, pingMs: Int) {
+    fun updateMetrics(
+        downSpeed: String,
+        upSpeed: String,
+        pingMs: Int,
+        ramPercent: Int,
+        tempTenths: Int
+    ) {
         if (!isViewAttached || floatingView == null) return
 
         val updateAction = {
             if (isViewAttached && floatingView != null) {
-                val newDownText = "↓ $downSpeed"
-                val newUpText = "↑ $upSpeed"
-                val newPingText = if (pingMs >= 0) "${pingMs}ms" else "-- ms"
-
-                // Hanya perbarui TextView jika isi teks berubah untuk meminimalkan beban render UI
-                if (lastDownText != newDownText) {
-                    tvDownload?.text = newDownText
-                    lastDownText = newDownText
+                // 1. Download
+                if (currentConfig.showDownload) {
+                    val newDownText = "↓ $downSpeed"
+                    if (lastDownText != newDownText) {
+                        tvDownload?.text = newDownText
+                        lastDownText = newDownText
+                    }
                 }
 
-                if (lastUpText != newUpText) {
-                    tvUpload?.text = newUpText
-                    lastUpText = newUpText
+                // 2. Upload
+                if (currentConfig.showUpload) {
+                    val newUpText = "↑ $upSpeed"
+                    if (lastUpText != newUpText) {
+                        tvUpload?.text = newUpText
+                        lastUpText = newUpText
+                    }
                 }
 
-                if (lastPingText != newPingText) {
-                    tvPing?.text = newPingText
-                    lastPingText = newPingText
+                // 3. Ping
+                if (currentConfig.showPing) {
+                    val newPingText = if (pingMs >= 0) "${pingMs}ms" else "-- ms"
+                    if (lastPingText != newPingText) {
+                        tvPing?.text = newPingText
+                        lastPingText = newPingText
+                    }
+                }
+
+                // 4. RAM
+                if (currentConfig.showRam) {
+                    val newRamText = "RAM ${ramPercent}%"
+                    if (lastRamText != newRamText) {
+                        tvRam?.text = newRamText
+                        lastRamText = newRamText
+                    }
+                }
+
+                // 5. Suhu
+                if (currentConfig.showTemp) {
+                    val newTempText = if (tempTenths > 0) "${tempTenths / 10}.${tempTenths % 10}°C" else "--°C"
+                    if (lastTempText != newTempText) {
+                        tvTemp?.text = newTempText
+                        lastTempText = newTempText
+                    }
                 }
             }
         }

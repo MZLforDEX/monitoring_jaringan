@@ -9,21 +9,18 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import com.example.netmonitor.model.MonitorConfig
 
 /**
- * Aktivitas utama untuk konfigurasi, verifikasi izin runtime/overlay,
- * serta kontrol mulai dan hentikan NetworkMonitorService.
- *
- * Efisiensi & Kepatuhan Modern Android:
- * 1. Menggunakan ActivityResultContracts (Zero deprecated startActivityForResult).
- * 2. Penanganan alur izin bertingkat (Overlay SYSTEM_ALERT_WINDOW dan Notifikasi POST_NOTIFICATIONS).
- * 3. Sinkronisasi status Service secara real-time pada siklus hidup onResume().
+ * Aktivitas utama untuk konfigurasi performa HUD, verifikasi izin,
+ * pengaturan kustomisasi metrik yang ditampilkan, dan kontrol Service.
  */
 class MainActivity : ComponentActivity() {
 
@@ -36,7 +33,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var btnGrantNotification: Button
     private lateinit var btnToggleService: Button
 
-    // 1. Launcher modern untuk perizinan overlay (SYSTEM_ALERT_WINDOW)
+    // CheckBoxes Kustomisasi Metrik
+    private lateinit var cbDownload: CheckBox
+    private lateinit var cbUpload: CheckBox
+    private lateinit var cbPing: CheckBox
+    private lateinit var cbRam: CheckBox
+    private lateinit var cbTemp: CheckBox
+
+    // 1. Launcher modern untuk izin overlay (SYSTEM_ALERT_WINDOW)
     private val overlayPermissionLauncher: ActivityResultLauncher<Intent> =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             updateUiState()
@@ -62,12 +66,12 @@ class MainActivity : ComponentActivity() {
         setContentView(R.layout.activity_main)
 
         initViews()
+        loadCustomConfig()
         setupListeners()
     }
 
     override fun onResume() {
         super.onResume()
-        // Sinkronisasi status service dan kartu izin setiap kali aktivitas tampil kembali
         updateUiState()
     }
 
@@ -80,6 +84,24 @@ class MainActivity : ComponentActivity() {
         cardNotificationPermission = findViewById(R.id.cardNotificationPermission)
         btnGrantNotification = findViewById(R.id.btnGrantNotification)
         btnToggleService = findViewById(R.id.btnToggleService)
+
+        cbDownload = findViewById(R.id.cbDownload)
+        cbUpload = findViewById(R.id.cbUpload)
+        cbPing = findViewById(R.id.cbPing)
+        cbRam = findViewById(R.id.cbRam)
+        cbTemp = findViewById(R.id.cbTemp)
+    }
+
+    /**
+     * Memuat status checkbox dari konfigurasi tersimpan.
+     */
+    private fun loadCustomConfig() {
+        val config = MonitorConfig.load(this)
+        cbDownload.isChecked = config.showDownload
+        cbUpload.isChecked = config.showUpload
+        cbPing.isChecked = config.showPing
+        cbRam.isChecked = config.showRam
+        cbTemp.isChecked = config.showTemp
     }
 
     private fun setupListeners() {
@@ -94,22 +116,47 @@ class MainActivity : ComponentActivity() {
         btnToggleService.setOnClickListener {
             handleToggleService()
         }
+
+        // Listener untuk pembaruan kustomisasi metrik secara instan
+        val configChangeListener = {
+            saveAndApplyConfig()
+        }
+
+        cbDownload.setOnCheckedChangeListener { _, _ -> configChangeListener() }
+        cbUpload.setOnCheckedChangeListener { _, _ -> configChangeListener() }
+        cbPing.setOnCheckedChangeListener { _, _ -> configChangeListener() }
+        cbRam.setOnCheckedChangeListener { _, _ -> configChangeListener() }
+        cbTemp.setOnCheckedChangeListener { _, _ -> configChangeListener() }
     }
 
     /**
-     * Menangani interaksi tombol utama Start/Stop.
+     * Menyimpan pilihan checkbox pengguna dan meneruskannya langsung ke Service yang sedang aktif.
      */
+    private fun saveAndApplyConfig() {
+        val newConfig = MonitorConfig(
+            showDownload = cbDownload.isChecked,
+            showUpload = cbUpload.isChecked,
+            showPing = cbPing.isChecked,
+            showRam = cbRam.isChecked,
+            showTemp = cbTemp.isChecked
+        )
+        MonitorConfig.save(this, newConfig)
+
+        // Perbarui widget secara langsung tanpa harus restart service
+        if (NetworkMonitorService.isServiceRunning) {
+            NetworkMonitorService.updateConfiguration(newConfig)
+        }
+    }
+
     private fun handleToggleService() {
         if (NetworkMonitorService.isServiceRunning) {
             stopMonitorService()
         } else {
-            // Validasi izin overlay sebelum memulai
             if (!hasOverlayPermission()) {
                 requestOverlayPermission()
                 return
             }
 
-            // Validasi izin notifikasi (Android 13+) sebelum memulai
             if (!hasNotificationPermission()) {
                 requestNotificationPermission()
                 return
@@ -119,34 +166,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Menjalankan NetworkMonitorService sebagai Foreground Service.
-     */
     private fun startMonitorService() {
+        saveAndApplyConfig()
         val serviceIntent = Intent(this, NetworkMonitorService::class.java)
         ContextCompat.startForegroundService(this, serviceIntent)
         updateUiState()
     }
 
-    /**
-     * Menghentikan NetworkMonitorService.
-     */
     private fun stopMonitorService() {
         val serviceIntent = Intent(this, NetworkMonitorService::class.java)
         stopService(serviceIntent)
         updateUiState()
     }
 
-    /**
-     * Memeriksa apakah aplikasi memiliki izin overlay (SYSTEM_ALERT_WINDOW).
-     */
     private fun hasOverlayPermission(): Boolean {
         return Settings.canDrawOverlays(this)
     }
 
-    /**
-     * Memeriksa izin POST_NOTIFICATIONS untuk Android 13+ (API 33+).
-     */
     private fun hasNotificationPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
@@ -158,10 +194,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Mengarahkan pengguna secara langsung ke halaman pengaturan izin overlay aplikasi.
-     * Dilengkapi fallback jika OEM perangkat tidak mendukung URI package langsung.
-     */
     private fun requestOverlayPermission() {
         try {
             val intent = Intent(
@@ -183,42 +215,34 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Menampilkan dialog permintaan izin notifikasi runtime.
-     */
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
-    /**
-     * Memperbarui antarmuka berdasarkan status perizinan dan status hidupnya Service.
-     */
     private fun updateUiState() {
         val hasOverlay = hasOverlayPermission()
         val hasNotification = hasNotificationPermission()
         val isRunning = NetworkMonitorService.isServiceRunning
 
-        // 1. Tampilkan/Sembunyikan kartu peringatan perizinan
         cardOverlayPermission.visibility = if (!hasOverlay) View.VISIBLE else View.GONE
         cardNotificationPermission.visibility =
             if (!hasNotification && hasOverlay) View.VISIBLE else View.GONE
 
-        // 2. Perbarui status kartu dan tombol Start/Stop
         if (isRunning) {
             viewStatusDot.setBackgroundResource(R.drawable.bg_button_start)
-            tvStatusTitle.text = "Monitor Jaringan: Aktif"
+            tvStatusTitle.text = "Monitor: Aktif"
             tvStatusSubtitle.text = "Widget melayang aktif di layar. Geser (drag) untuk memindahkan."
 
             btnToggleService.text = "Hentikan Monitor"
             btnToggleService.setBackgroundResource(R.drawable.bg_button_stop)
         } else {
             viewStatusDot.setBackgroundResource(R.drawable.bg_button_stop)
-            tvStatusTitle.text = "Monitor Jaringan: Nonaktif"
+            tvStatusTitle.text = "Monitor: Nonaktif"
             tvStatusSubtitle.text = "Widget melayang belum berjalan di layar."
 
-            btnToggleService.text = "Mulai Monitor Jaringan"
+            btnToggleService.text = "Mulai Monitor"
             btnToggleService.setBackgroundResource(R.drawable.bg_button_start)
         }
     }

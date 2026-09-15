@@ -15,8 +15,10 @@ import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import com.example.netmonitor.engine.DeviceStatsProvider
 import com.example.netmonitor.engine.PingExecutor
 import com.example.netmonitor.engine.TrafficCalculator
+import com.example.netmonitor.model.MonitorConfig
 import com.example.netmonitor.ui.FloatingWindowManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,20 +31,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Foreground Service pemantau throughput jaringan dan latensi secara real-time.
+ * Foreground Service pemantau performa sistem dan throughput jaringan secara real-time.
  *
- * Prinsip Arsitektur Senior:
- * 1. Zero Background Compute saat Layar Mati:
- *    Menghentikan loop kalkulasi dan pembacaan socket saat ACTION_SCREEN_OFF guna mencegah
- *    pengurasan baterai (battery drain) dan wakelock abuse.
- * 2. Isolasi Thread:
- *    Kalkulasi TrafficStats dan TCP Handshake Ping berjalan pada Coroutine background
- *    (Dispatchers.Default & Dispatchers.IO), kemudian dipublikasikan ke FloatingWindowManager di Dispatchers.Main.
- * 3. Kepatuhan Android 14+ (API 34+):
- *    Mendukung Foreground Service type 'specialUse' dengan NotificationChannel berprioritas rendah.
- * 4. Zero Memory Leak:
- *    Pembersihan menyeluruh pada onDestroy() mencakup pembatalan scope, unregister receiver,
- *    dan pelepasan view overlay dari WindowManager.
+ * Efisiensi & Kepatuhan:
+ * 1. Zero Background Compute saat Layar Mati: Jeda otomatis loop saat ACTION_SCREEN_OFF.
+ * 2. Modular & On-Demand: Komputasi metrik yang tidak diaktifkan pengguna diabaikan demi efisiensi CPU.
+ * 3. Kepatuhan Android 14+ (API 34+): Foreground Service type 'specialUse'.
+ * 4. Zero Memory Leak: Pembersihan tuntas saat onDestroy().
  */
 class NetworkMonitorService : Service() {
 
@@ -58,14 +53,26 @@ class NetworkMonitorService : Service() {
         @Volatile
         var isServiceRunning: Boolean = false
             private set
+
+        // Referensi instance aktif untuk pembaruan konfigurasi dinamis dari MainActivity
+        @Volatile
+        private var activeInstance: NetworkMonitorService? = null
+
+        fun updateConfiguration(config: MonitorConfig) {
+            activeInstance?.onConfigChanged(config)
+        }
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private lateinit var trafficCalculator: TrafficCalculator
+    private lateinit var deviceStatsProvider: DeviceStatsProvider
     private lateinit var floatingWindowManager: FloatingWindowManager
 
-    private var speedMonitorJob: Job? = null
+    @Volatile
+    private var currentConfig: MonitorConfig = MonitorConfig()
+
+    private var metricsMonitorJob: Job? = null
     private var pingMonitorJob: Job? = null
 
     @Volatile
@@ -73,19 +80,14 @@ class NetworkMonitorService : Service() {
 
     private var isReceiverRegistered: Boolean = false
 
-    /**
-     * Receiver untuk menangkap status layar (menyala / mati).
-     */
     private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_OFF -> {
-                    // Layar mati: Hentikan seluruh aktivitas komputasi demi hemat daya
                     pauseMonitoring()
                 }
 
                 Intent.ACTION_SCREEN_ON -> {
-                    // Layar menyala: Reset acuan kalkulator untuk mencegah spike palsu, lalu lanjutkan loop
                     resumeMonitoring()
                 }
             }
@@ -97,25 +99,23 @@ class NetworkMonitorService : Service() {
     override fun onCreate() {
         super.onCreate()
         isServiceRunning = true
+        activeInstance = this
 
+        currentConfig = MonitorConfig.load(this)
         trafficCalculator = TrafficCalculator()
+        deviceStatsProvider = DeviceStatsProvider(this)
         floatingWindowManager = FloatingWindowManager(this)
 
-        // 1. Inisialisasi notifikasi foreground sesuai regulasi Android 14+
         startForegroundServiceInternal()
 
-        // 2. Tampilkan floating overlay widget
         val isOverlayShown = floatingWindowManager.show()
         if (!isOverlayShown) {
-            // Jika izin overlay tidak aktif / dicabut, hentikan service agar tidak membebani sistem
             stopSelf()
             return
         }
 
-        // 3. Daftarkan BroadcastReceiver pendeteksi layar dengan RECEIVER_NOT_EXPORTED
         registerScreenReceiver()
 
-        // 4. Periksa kondisi awal interaktivitas layar
         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
         val isScreenOn = powerManager?.isInteractive ?: true
 
@@ -133,8 +133,13 @@ class NetworkMonitorService : Service() {
     }
 
     /**
-     * Memulai Foreground Service dengan NotificationChannel berprioritas rendah.
+     * Menerima pembaruan konfigurasi dari UI tanpa perlu restart service.
      */
+    fun onConfigChanged(newConfig: MonitorConfig) {
+        currentConfig = newConfig
+        floatingWindowManager.applyConfig(newConfig)
+    }
+
     private fun startForegroundServiceInternal() {
         createNotificationChannel()
 
@@ -149,8 +154,8 @@ class NetworkMonitorService : Service() {
         )
 
         val notification: Notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("Network Monitor Aktif")
-            .setContentText("Memantau kecepatan data dan latensi jaringan secara real-time.")
+            .setContentTitle("System & Network Monitor Aktif")
+            .setContentText("Memantau kecepatan data, latensi, RAM, dan suhu perangkat.")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
@@ -170,9 +175,6 @@ class NetworkMonitorService : Service() {
         }
     }
 
-    /**
-     * Membuat NotificationChannel dengan importance MIN agar tidak memunculkan suara atau getaran.
-     */
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -181,7 +183,7 @@ class NetworkMonitorService : Service() {
                 NOTIFICATION_CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Channel status monitor jaringan floating widget"
+                description = "Status monitor sistem & jaringan floating widget"
                 setShowBadge(false)
                 enableLights(false)
                 enableVibration(false)
@@ -190,9 +192,6 @@ class NetworkMonitorService : Service() {
         }
     }
 
-    /**
-     * Mendaftarkan screen broadcast receiver secara dinamis dengan proteksi RECEIVER_NOT_EXPORTED.
-     */
     private fun registerScreenReceiver() {
         if (!isReceiverRegistered) {
             val filter = IntentFilter().apply {
@@ -209,44 +208,57 @@ class NetworkMonitorService : Service() {
         }
     }
 
-    /**
-     * Melepas screen broadcast receiver secara aman.
-     */
     private fun unregisterScreenReceiver() {
         if (isReceiverRegistered) {
             try {
                 unregisterReceiver(screenStateReceiver)
             } catch (_: IllegalArgumentException) {
-                // Supresi jika receiver sudah terlepas
             } finally {
                 isReceiverRegistered = false
             }
         }
     }
 
-    /**
-     * Memulai kembali monitoring loop saat layar menyala.
-     * Menggunakan @Synchronized dan membersihkan job aktif untuk mencegah race condition.
-     */
     @Synchronized
     private fun resumeMonitoring() {
-        // Hentikan instance job yang mungkin belum selesai membatalkan diri
         pauseMonitoring()
-
-        // Reset patokan agar tidak terjadi lonjakan akumulasi byte selama layar mati
         trafficCalculator.reset()
 
-        // 1. Loop Kecepatan Jaringan (Setiap 1.000 ms)
-        speedMonitorJob = serviceScope.launch {
+        // 1. Loop Metrik Utama (Kecepatan Jaringan, RAM, Suhu setiap 1.000 ms)
+        metricsMonitorJob = serviceScope.launch {
             while (isActive) {
-                val snapshot = trafficCalculator.calculateSpeed()
+                val config = currentConfig
 
-                // Teruskan pembaruan data ke Floating Window di UI Thread
+                // Komputasi Kecepatan Jaringan (hanya jika salah satu aktif)
+                val downSpeed: String
+                val upSpeed: String
+                if (config.showDownload || config.showUpload) {
+                    val snapshot = trafficCalculator.calculateSpeed()
+                    downSpeed = snapshot.rxFormatted
+                    upSpeed = snapshot.txFormatted
+                } else {
+                    downSpeed = "0 B/s"
+                    upSpeed = "0 B/s"
+                }
+
+                // Komputasi RAM (hanya jika aktif)
+                val ramPercent = if (config.showRam) {
+                    deviceStatsProvider.getRamUsagePercent()
+                } else 0
+
+                // Komputasi Suhu (hanya jika aktif)
+                val tempTenths = if (config.showTemp) {
+                    deviceStatsProvider.getBatteryTemperatureTenths(this@NetworkMonitorService)
+                } else 0
+
+                // Publikasikan ke UI overlay
                 withContext(Dispatchers.Main) {
-                    floatingWindowManager.updateData(
-                        downSpeed = snapshot.rxFormatted,
-                        upSpeed = snapshot.txFormatted,
-                        pingMs = latestPingMs
+                    floatingWindowManager.updateMetrics(
+                        downSpeed = downSpeed,
+                        upSpeed = upSpeed,
+                        pingMs = latestPingMs,
+                        ramPercent = ramPercent,
+                        tempTenths = tempTenths
                     )
                 }
 
@@ -254,24 +266,23 @@ class NetworkMonitorService : Service() {
             }
         }
 
-        // 2. Loop Latensi Jaringan (Setiap 3.000 ms agar efisien daya)
+        // 2. Loop Latensi Jaringan (Setiap 3.000 ms jika diaktifkan)
         pingMonitorJob = serviceScope.launch {
             while (isActive) {
-                val latency = PingExecutor.measureLatency()
-                latestPingMs = latency
-
+                if (currentConfig.showPing) {
+                    latestPingMs = PingExecutor.measureLatency()
+                } else {
+                    latestPingMs = -1
+                }
                 delay(PING_INTERVAL_MS)
             }
         }
     }
 
-    /**
-     * Menghentikan komputasi dan pengukuran jaringan saat layar mati.
-     */
     @Synchronized
     private fun pauseMonitoring() {
-        speedMonitorJob?.cancel()
-        speedMonitorJob = null
+        metricsMonitorJob?.cancel()
+        metricsMonitorJob = null
 
         pingMonitorJob?.cancel()
         pingMonitorJob = null
@@ -281,19 +292,14 @@ class NetworkMonitorService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-
-        // 1. Batalkan seluruh Coroutine
         pauseMonitoring()
         serviceScope.cancel()
 
-        // 2. Lepas screen broadcast receiver
         unregisterScreenReceiver()
-
-        // 3. Lepas floating window overlay dari WindowManager
         floatingWindowManager.destroy()
 
-        // 4. Hentikan status foreground notification
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         isServiceRunning = false
+        activeInstance = null
     }
 }

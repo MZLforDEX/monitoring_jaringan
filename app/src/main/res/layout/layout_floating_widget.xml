@@ -11,7 +11,7 @@
     android:paddingEnd="12dp"
     android:paddingBottom="6dp">
 
-    <!-- Indikator & Kecepatan Unduh (Download) -->
+    <!-- 1. Indikator & Kecepatan Unduh (Download) -->
     <TextView
         android:id="@+id/tvDownload"
         android:layout_width="wrap_content"
@@ -22,15 +22,15 @@
         android:textSize="11sp"
         android:fontFamily="sans-serif-medium" />
 
-    <!-- Garis Pemisah Vertikal Tipis -->
     <View
+        android:id="@+id/sepDownload"
         android:layout_width="1dp"
         android:layout_height="10dp"
         android:layout_marginStart="8dp"
         android:layout_marginEnd="8dp"
         android:background="#33FFFFFF" />
 
-    <!-- Indikator & Kecepatan Unggah (Upload) -->
+    <!-- 2. Indikator & Kecepatan Unggah (Upload) -->
     <TextView
         android:id="@+id/tvUpload"
         android:layout_width="wrap_content"
@@ -41,15 +41,15 @@
         android:textSize="11sp"
         android:fontFamily="sans-serif-medium" />
 
-    <!-- Garis Pemisah Vertikal Tipis -->
     <View
+        android:id="@+id/sepUpload"
         android:layout_width="1dp"
         android:layout_height="10dp"
         android:layout_marginStart="8dp"
         android:layout_marginEnd="8dp"
         android:background="#33FFFFFF" />
 
-    <!-- Indikator Latensi / Ping -->
+    <!-- 3. Indikator Latensi / Ping -->
     <TextView
         android:id="@+id/tvPing"
         android:layout_width="wrap_content"
@@ -57,6 +57,44 @@
         android:includeFontPadding="false"
         android:text="-- ms"
         android:textColor="#FFB74D"
+        android:textSize="11sp"
+        android:fontFamily="sans-serif-medium" />
+
+    <View
+        android:id="@+id/sepPing"
+        android:layout_width="1dp"
+        android:layout_height="10dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:background="#33FFFFFF" />
+
+    <!-- 4. Indikator Penggunaan RAM -->
+    <TextView
+        android:id="@+id/tvRam"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:includeFontPadding="false"
+        android:text="RAM 0%"
+        android:textColor="#BA68C8"
+        android:textSize="11sp"
+        android:fontFamily="sans-serif-medium" />
+
+    <View
+        android:id="@+id/sepRam"
+        android:layout_width="1dp"
+        android:layout_height="10dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:background="#33FFFFFF" />
+
+    <!-- 5. Indikator Suhu Perangkat / Baterai -->
+    <TextView
+        android:id="@+id/tvTemp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:includeFontPadding="false"
+        android:text="0°C"
+        android:textColor="#FF8A65"
         android:textSize="11sp"
         android:fontFamily="sans-serif-medium" />
 
