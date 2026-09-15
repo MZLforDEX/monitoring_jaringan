@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <!-- Latar belakang semi-transparan gelap pekat (#CC1E1E1E) -->
+    <solid android:color="#CC1E1E1E" />
+
+    <!-- Border tipis semi-transparan untuk visibilitas di latar terang & gelap -->
+    <stroke
+        android:width="1dp"
+        android:color="#33FFFFFF" />
+
+    <!-- Corner radius tinggi untuk membentuk pil (pill shape) sempurna -->
+    <corners android:radius="24dp" />
+
+</shape>

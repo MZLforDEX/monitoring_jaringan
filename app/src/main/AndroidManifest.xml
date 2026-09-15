@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 1. Izin Pemantauan Lalu Lintas Jaringan -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- 2. Izin Tampilan Floating Window Overlay di atas aplikasi lain -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- 3. Izin Dasar Foreground Service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- 4. Izin Foreground Service Android 14+ (API 34+) untuk tipe specialUse -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- 5. Izin Menampilkan Notifikasi Foreground Service Android 13+ (API 33+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@android:drawable/ic_dialog_info"
+        android:label="Network Monitor"
+        android:roundIcon="@android:drawable/ic_dialog_info"
+        android:supportsRtl="true">
+
+        <!-- Main Activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Foreground Service untuk pemantauan throughput jaringan dan floating overlay -->
+        <service
+            android:name=".NetworkMonitorService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+
+            <!-- Metadata wajib Android 14+ (API 34+) untuk subtype specialUse FGS -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Pemantauan bandwidth, kecepatan unduh/unggah, dan status jaringan secara real-time melalui floating overlay hemat baterai" />
+        </service>
+
+    </application>
+
+</manifest>
