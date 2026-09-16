@@ -3,7 +3,6 @@ package com.example.netmonitor.engine
 import android.content.pm.PackageManager
 import android.util.Log
 import rikka.shizuku.Shizuku
-import java.lang.reflect.Method
 
 /**
  * Pengelola interaksi dengan Shizuku API untuk mengeksekusi perintah shell dengan hak istimewa ADB
@@ -12,22 +11,6 @@ import java.lang.reflect.Method
 object ShizukuManager {
 
     private const val TAG = "ShizukuManager"
-
-    private val newProcessMethod: Method? by lazy {
-        try {
-            Shizuku::class.java.getDeclaredMethod(
-                "newProcess",
-                Array<String>::class.java,
-                Array<String>::class.java,
-                String::class.java
-            ).apply {
-                isAccessible = true
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Gagal menginisialisasi newProcess reflection: ${e.message}")
-            null
-        }
-    }
 
     /**
      * Memeriksa apakah Shizuku Service sedang aktif dan binder tersedia.
@@ -77,7 +60,13 @@ object ShizukuManager {
     fun execute(command: Array<String>): Process? {
         if (!hasPermission()) return null
         return try {
-            val method = newProcessMethod ?: return null
+            val method = Shizuku::class.java.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            )
+            method.isAccessible = true
             method.invoke(null, command, null, null) as? Process
         } catch (e: Throwable) {
             Log.e(TAG, "Gagal menjalankan proses Shizuku: ${e.message}")

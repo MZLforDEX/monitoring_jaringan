@@ -13,17 +13,16 @@ import java.io.InputStreamReader
 import kotlin.math.roundToInt
 
 /**
- * Provider pemantau Frame Rate / Refresh Rate layar cerdas (Hybrid Mode).
+ * Provider pemantau Real-Time Frame Rate / Refresh Rate layar cerdas (Hybrid Mode).
  *
  * Mode Operasi:
- * 1. Shizuku Mode (True Game FPS) - PRIORITAS UTAMA:
- *    - Berjalan dengan hak istimewa shell ADB tanpa root.
- *    - Melewati batasan SELinux secara legal dan membaca frame aktual dari SurfaceFlinger.
- * 2. ADB DUMP Mode:
- *    - Menggunakan android.permission.DUMP jika diberikan via ADB pm grant.
- * 3. Default Mode (Display Refresh Rate / Hz) - Fallback:
- *    - Aktif secara instan tanpa konfigurasi apapun.
- *    - Nol beban CPU / baterai.
+ * 1. True Real-Time Game FPS (Shizuku / ADB DUMP):
+ *    - Engine Utama: `service call SurfaceFlinger 1013` untuk membaca counter PageFlip hardware
+ *      compositor secara real-time dan akurat per detik (ΔFrames / ΔTime).
+ *    - Engine Cadangan: `dumpsys SurfaceFlinger --latency <active_layer>` dengan layer SurfaceView
+ *      game aktif dari `dumpsys SurfaceFlinger --list`.
+ *    - Memberikan fluktuasi frame rate aktual (misal: 58 FPS, 59 FPS, 60 FPS) saat bermain game.
+ * 2. Display Refresh Rate (Hz) - Fallback jika Shizuku/ADB belum diizinkan.
  */
 class FpsProvider(private val context: Context) {
 
@@ -34,11 +33,17 @@ class FpsProvider(private val context: Context) {
     private val windowManager: WindowManager =
         context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-    private var cachedGameLayer: String? = null
+    // State kalkulasi PageFlip delta
+    private var lastFlipCount: Long = -1L
+    private var lastFlipTimeMs: Long = 0L
+
+    // Cache layer terdaftar
+    private var cachedLayers: List<String> = emptyList()
     private var lastLayerQueryTime: Long = 0L
 
-    private var cachedFocusWindow: String? = null
-    private var lastFocusQueryTime: Long = 0L
+    // Cache FPS valid terakhir & timestamp
+    private var lastValidFps: Int = -1
+    private var lastPositiveFpsTime: Long = 0L
 
     /**
      * Memeriksa apakah Shizuku aktif dan izin telah diberikan oleh pengguna.
@@ -63,7 +68,7 @@ class FpsProvider(private val context: Context) {
     }
 
     /**
-     * Memeriksa apakah akses True Game FPS tersedia (baik via Shizuku atau ADB DUMP).
+     * Memeriksa apakah akses True Game FPS tersedia (via Shizuku atau ADB DUMP).
      */
     fun isTrueFpsAvailable(): Boolean {
         return isShizukuGranted() || isDumpPermissionGranted()
@@ -82,7 +87,7 @@ class FpsProvider(private val context: Context) {
     }
 
     /**
-     * Mengambil angka frekuensi refresh layar fisik dalam bentuk Integer (misal: 60, 90, 120, 144).
+     * Mengambil angka frekuensi refresh layar fisik bawaan (misal: 60, 90, 120, 144).
      */
     fun getDisplayRefreshRateNumber(): Int {
         val display: Display? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -102,244 +107,279 @@ class FpsProvider(private val context: Context) {
     }
 
     /**
-     * Mengambil metrik FPS atau Hz saat ini dalam bentuk string ringkas.
-     * Jika True FPS aktif (Shizuku / ADB), akan selalu berakhiran "FPS" (misal: "59 FPS" atau "60 FPS").
-     * Jika True FPS tidak aktif, akan berakhiran "Hz" (misal: "60 Hz").
+     * Mengambil metrik FPS atau Hz saat ini dalam bentuk string ringkas real-time.
+     * Mengembalikan nilai aktual (misal: "59 FPS", "60 FPS", "45 FPS").
      */
     fun getFrameMetric(): String {
-        return if (isTrueFpsAvailable()) {
-            val fps = getTrueGameFps()
-            if (fps > 0) {
-                "$fps FPS"
+        if (!isTrueFpsAvailable()) {
+            val hz = getDisplayRefreshRateNumber()
+            return "$hz Hz"
+        }
+
+        val fps = getTrueGameFps()
+        val now = System.currentTimeMillis()
+
+        return if (fps > 0) {
+            lastValidFps = fps
+            lastPositiveFpsTime = now
+            "$fps FPS"
+        } else if (fps == 0) {
+            // Jika layar diam (tidak ada render frame baru dalam 1.2 detik terakhir)
+            if (lastValidFps > 0 && (now - lastPositiveFpsTime) < 1200L) {
+                "$lastValidFps FPS"
             } else {
-                // Saat layar diam / transisi, tampilkan VSYNC frame limit layar sebagai FPS
+                "0 FPS"
+            }
+        } else {
+            // Jika proses query pertama kali belum memiliki delta (detik pertama)
+            if (lastValidFps > 0) {
+                "$lastValidFps FPS"
+            } else {
                 val hz = getDisplayRefreshRateNumber()
                 "$hz FPS"
             }
-        } else {
-            val hz = getDisplayRefreshRateNumber()
-            "$hz Hz"
         }
     }
 
+    // State kalkulasi latency per layer
+    private val layerLastMaxTimestamp = HashMap<String, Long>()
+    private val layerLastQueryTimeMs = HashMap<String, Long>()
+
     /**
-     * Membaca real game frame rate via SurfaceFlinger latency dump.
-     * Mengutamakan Shizuku (hak shell ADB), lalu direct exec sebagai fallback.
+     * Membaca real game frame rate aktual dari SurfaceFlinger.
+     * Mengutamakan PageFlip counter delta, dan beralih ke active layer latency jika diperlukan.
      */
     private fun getTrueGameFps(): Int {
-        // 1. Eksekusi via Shizuku (Bypass SELinux) jika izin Shizuku aktif
-        if (isShizukuGranted()) {
-            val fpsShizuku = queryFpsWithProcessRunner { cmd ->
-                ShizukuManager.execute(cmd)
-            }
-            if (fpsShizuku > 0) return fpsShizuku
-        }
-
-        // 2. Eksekusi direct system dumpsys (Fallback jika DUMP diizinkan & kompatibel)
-        if (isDumpPermissionGranted()) {
-            val fpsDirect = queryFpsWithProcessRunner { cmd ->
+        val runner: (Array<String>) -> Process? = when {
+            isShizukuGranted() -> { cmd -> ShizukuManager.execute(cmd) }
+            isDumpPermissionGranted() -> { cmd ->
                 try {
                     Runtime.getRuntime().exec(cmd)
                 } catch (e: Exception) {
-                    Log.d(TAG, "Direct dumpsys exec failed: ${e.message}")
                     null
                 }
             }
-            if (fpsDirect > 0) return fpsDirect
+            else -> return -1
         }
 
-        return 0
+        // 1. Prioritas Utama: Service Call SurfaceFlinger 1013 (Delta PageFlip counter hardware)
+        val flipFps = getFpsFromPageFlip(runner)
+        if (flipFps >= 0) {
+            return flipFps
+        }
+
+        // 2. Prioritas Kedua: Query Latency dari layer game spesifik yang sedang aktif
+        val latencyFps = getFpsFromSurfaceFlingerLatency(runner)
+        if (latencyFps >= 0) {
+            return latencyFps
+        }
+
+        return -1
     }
 
     /**
-     * Menjalankan query latency ke SurfaceFlinger menggunakan Process runner yang diberikan.
-     * Menguji SurfaceView, layer game aktif, focused window, dan global latency.
+     * Engine 1: Mengukur FPS real-time berdasarkan delta PageFlip counter SurfaceFlinger.
+     * Menghitung secara presisi: FPS = ΔFrames * 1000 / ΔTimeMs.
      */
-    private fun queryFpsWithProcessRunner(runner: (Array<String>) -> Process?): Int {
+    private fun getFpsFromPageFlip(runner: (Array<String>) -> Process?): Int {
         try {
-            // 1. Uji target SurfaceView langsung (format standar untuk 99% game Android: Unity, Unreal, Cocos)
-            val svProcess = runner(arrayOf("dumpsys", "SurfaceFlinger", "--latency", "SurfaceView"))
-            if (svProcess != null) {
-                val frames = svProcess.inputStream.use { stream -> parseLatencyStream(stream) }
-                svProcess.destroy()
-                if (frames > 0) {
-                    Log.d(TAG, "SurfaceView latency frame count: $frames")
-                    return frames
-                }
+            val proc = runner(arrayOf("service", "call", "SurfaceFlinger", "1013")) ?: return -1
+            val output = BufferedReader(InputStreamReader(proc.inputStream)).use { it.readText() }
+            proc.destroy()
+            if (output.isBlank()) return -1
+
+            val currentCount = extractFlipCountFromParcel(output) ?: return -1
+            val nowMs = System.currentTimeMillis()
+
+            if (lastFlipCount < 0L || lastFlipTimeMs <= 0L) {
+                lastFlipCount = currentCount
+                lastFlipTimeMs = nowMs
+                return -1
             }
 
-            // 2. Uji layer spesifik yang terdeteksi dari dumpsys SurfaceFlinger --list
-            val targetLayer = findActiveGameLayer(runner)
-            if (!targetLayer.isNullOrBlank() && targetLayer != "SurfaceView") {
-                val layerProcess = runner(arrayOf("dumpsys", "SurfaceFlinger", "--latency", targetLayer))
-                if (layerProcess != null) {
-                    val frames = layerProcess.inputStream.use { stream -> parseLatencyStream(stream) }
-                    layerProcess.destroy()
-                    if (frames > 0) {
-                        Log.d(TAG, "Target layer ($targetLayer) frame count: $frames")
-                        return frames
-                    }
-                }
-            }
+            val elapsedMs = nowMs - lastFlipTimeMs
+            val deltaFrames = currentCount - lastFlipCount
 
-            // 3. Uji focused window saat ini (untuk aplikasi non-game atau browser)
-            val focusedWin = getFocusedWindow(runner)
-            if (!focusedWin.isNullOrBlank()) {
-                val winProcess = runner(arrayOf("dumpsys", "SurfaceFlinger", "--latency", focusedWin))
-                if (winProcess != null) {
-                    val frames = winProcess.inputStream.use { stream -> parseLatencyStream(stream) }
-                    winProcess.destroy()
-                    if (frames > 0) {
-                        Log.d(TAG, "Focused window ($focusedWin) frame count: $frames")
-                        return frames
-                    }
-                }
-            }
+            lastFlipCount = currentCount
+            lastFlipTimeMs = nowMs
 
-            // 4. Fallback ke latency tanpa argumen
-            val defaultProcess = runner(arrayOf("dumpsys", "SurfaceFlinger", "--latency"))
-            if (defaultProcess != null) {
-                val frames = defaultProcess.inputStream.use { stream -> parseLatencyStream(stream) }
-                defaultProcess.destroy()
-                if (frames > 0) return frames
+            if (elapsedMs in 400..3000 && deltaFrames >= 0L) {
+                val calculatedFps = ((deltaFrames * 1000.0) / elapsedMs).roundToInt()
+                if (calculatedFps in 0..240) {
+                    return calculatedFps
+                }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Gagal mengukur latency SurfaceFlinger", e)
+            Log.d(TAG, "getFpsFromPageFlip error: ${e.message}")
         }
-        return 0
+        return -1
     }
 
     /**
-     * Mem-parsing data output dari "dumpsys SurfaceFlinger --latency <layer>".
-     * Baris pertama: Periode refresh dalam nanodetik.
-     * Baris berikutnya (128 baris):
-     * - Kolom A (index 0): App Draw Start
-     * - Kolom B (index 1): VSYNC submit
-     * - Kolom C (index 2): Actual Present Time ke display hardware
+     * Mem-parsing string Parcel heksadesimal dari keluaran service call SurfaceFlinger 1013.
+     * Mendukung format satu baris maupun format hexdump multi-baris pada semua versi Android.
      */
-    private fun parseLatencyStream(inputStream: InputStream): Int {
+    private fun extractFlipCountFromParcel(output: String): Long? {
+        return try {
+            val startIndex = output.indexOf('(')
+            val endIndex = output.lastIndexOf(')')
+            val content = if (startIndex != -1 && endIndex > startIndex) {
+                output.substring(startIndex + 1, endIndex)
+            } else {
+                output
+            }
+            val tokens = content.split("\\s+".toRegex())
+                .map { it.trim().trim('\'', '"') }
+                .filter { token ->
+                    token.isNotEmpty() &&
+                    !token.startsWith("0x", ignoreCase = true) &&
+                    !token.endsWith(":") &&
+                    token.all { c -> c.isDigit() || c in 'a'..'f' || c in 'A'..'F' }
+                }
+            if (tokens.isEmpty()) return null
+            val hex = if (tokens.size >= 2 && tokens[0] == "00000000") {
+                tokens[1]
+            } else {
+                tokens.last()
+            }
+            hex.toLongOrNull(16)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Engine 2: Membaca frame latency dari layer SurfaceView / game aktif terdaftar.
+     */
+    private fun getFpsFromSurfaceFlingerLatency(runner: (Array<String>) -> Process?): Int {
+        val activeLayers = getActiveLayers(runner)
+        for (layer in activeLayers.take(4)) {
+            try {
+                val proc = runner(arrayOf("dumpsys", "SurfaceFlinger", "--latency", layer)) ?: continue
+                val fps = proc.inputStream.use { stream -> parseLayerLatency(layer, stream) }
+                proc.destroy()
+                if (fps >= 0) {
+                    return fps
+                }
+            } catch (_: Exception) {
+            }
+        }
+        return -1
+    }
+
+    /**
+     * Mem-parsing data keluaran dumpsys SurfaceFlinger --latency untuk layer tertentu secara real-time.
+     */
+    private fun parseLayerLatency(layer: String, inputStream: InputStream): Int {
         return try {
             BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                val refreshPeriodLine = reader.readLine() ?: return 0
-                val refreshPeriod = refreshPeriodLine.trim().toLongOrNull() ?: return 0
-                if (refreshPeriod <= 0) return 0
+                val refreshPeriodLine = reader.readLine() ?: return -1
+                val refreshPeriod = refreshPeriodLine.trim().toLongOrNull() ?: return -1
+                if (refreshPeriod <= 0) return -1
 
-                var latestPresentTime = 0L
+                val nowMs = System.currentTimeMillis()
+                val nowNs = System.nanoTime()
+                var maxTimestamp = 0L
                 val frameTimes = ArrayList<Long>()
 
                 var line = reader.readLine()
                 while (line != null) {
                     val parts = line.trim().split("\\s+".toRegex())
-                    if (parts.size >= 3) {
-                        // Kolom 2 adalah actual present time, kolom 1 adalah fallback
-                        val c2 = parts[2].toLongOrNull() ?: 0L
-                        val c1 = parts[1].toLongOrNull() ?: 0L
+                    if (parts.size >= 2) {
+                        val c1 = parts.getOrNull(1)?.toLongOrNull() ?: 0L
+                        val c2 = parts.getOrNull(2)?.toLongOrNull() ?: 0L
+                        val c0 = parts.getOrNull(0)?.toLongOrNull() ?: 0L
+
                         val presentTime = when {
-                            c2 in 1L until 9_000_000_000_000_000_000L -> c2
                             c1 in 1L until 9_000_000_000_000_000_000L -> c1
+                            c2 in 1L until 9_000_000_000_000_000_000L -> c2
+                            c0 in 1L until 9_000_000_000_000_000_000L -> c0
                             else -> 0L
                         }
 
                         if (presentTime > 0L) {
                             frameTimes.add(presentTime)
-                            if (presentTime > latestPresentTime) {
-                                latestPresentTime = presentTime
+                            if (presentTime > maxTimestamp) {
+                                maxTimestamp = presentTime
                             }
                         }
                     }
                     line = reader.readLine()
                 }
 
-                if (latestPresentTime <= 0L || frameTimes.isEmpty()) return 0
+                if (maxTimestamp <= 0L || frameTimes.isEmpty()) return -1
 
-                // Hitung frame yang dipresentasikan dalam rentang 1 detik (1.000.000.000 ns) dari frame terakhir
-                val oneSecAgo = latestPresentTime - 1_000_000_000L
+                val prevMax = layerLastMaxTimestamp[layer]
+                val prevTimeMs = layerLastQueryTimeMs[layer]
+
+                layerLastMaxTimestamp[layer] = maxTimestamp
+                layerLastQueryTimeMs[layer] = nowMs
+
+                if (prevMax != null && prevTimeMs != null) {
+                    val elapsedMs = nowMs - prevTimeMs
+                    if (elapsedMs in 500..3000) {
+                        var newFrames = 0
+                        for (t in frameTimes) {
+                            if (t > prevMax) {
+                                newFrames++
+                            }
+                        }
+                        return ((newFrames * 1000.0) / elapsedMs).roundToInt().coerceIn(0, 240)
+                    }
+                }
+
+                // Fallback kalkulasi berbasis jendela 1 detik monotonic
+                val oneSecAgo = nowNs - 1_000_000_000L
                 var count = 0
                 for (t in frameTimes) {
-                    if (t in oneSecAgo..latestPresentTime) {
+                    if (t in oneSecAgo..nowNs) {
                         count++
                     }
                 }
-                count
+                count.coerceIn(0, 240)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "parseLatencyStream error", e)
-            0
+            Log.e(TAG, "parseLayerLatency error", e)
+            -1
         }
     }
 
     /**
-     * Mendeteksi nama layer SurfaceView game yang sedang aktif di latar depan dari dumpsys SurfaceFlinger --list.
+     * Mendeteksi nama-nama layer render aktif dari dumpsys SurfaceFlinger --list.
      */
-    private fun findActiveGameLayer(runner: (Array<String>) -> Process?): String? {
+    private fun getActiveLayers(runner: (Array<String>) -> Process?): List<String> {
         val now = System.currentTimeMillis()
-        if (cachedGameLayer != null && now - lastLayerQueryTime < 3000L) {
-            return cachedGameLayer
+        if (now - lastLayerQueryTime < 2500L && cachedLayers.isNotEmpty()) {
+            return cachedLayers
         }
         lastLayerQueryTime = now
 
-        return try {
-            val listProc = runner(arrayOf("dumpsys", "SurfaceFlinger", "--list")) ?: return null
+        val layers = ArrayList<String>()
+        try {
+            val listProc = runner(arrayOf("dumpsys", "SurfaceFlinger", "--list")) ?: return emptyList()
             BufferedReader(InputStreamReader(listProc.inputStream)).use { reader ->
                 var line = reader.readLine()
-                var candidate: String? = null
-                val ignoredKeywords = listOf(
+                val ignored = listOf(
                     "StatusBar", "NavigationBar", "com.example.netmonitor",
-                    "InputMethod", "ScreenDecorOverlay", "VolumeDialog", "Magnification"
+                    "InputMethod", "ScreenDecor", "Volume", "Magnification",
+                    "Background for", "Screenshot", "Snapshot"
                 )
                 while (line != null) {
                     val trimmed = line.trim()
-                    if (trimmed.isNotEmpty() && !ignoredKeywords.any { trimmed.contains(it) }) {
-                        if (trimmed.contains("SurfaceView") || trimmed.startsWith("SurfaceView")) {
-                            candidate = trimmed
-                            break
-                        } else if (candidate == null && trimmed.contains("/")) {
-                            candidate = trimmed
-                        }
-                    }
-                    line = reader.readLine()
-                }
-                listProc.destroy()
-                cachedGameLayer = candidate
-                candidate
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Mengambil nama jendela yang sedang aktif (mCurrentFocus) dari dumpsys window.
-     */
-    private fun getFocusedWindow(runner: (Array<String>) -> Process?): String? {
-        val now = System.currentTimeMillis()
-        if (cachedFocusWindow != null && now - lastFocusQueryTime < 3000L) {
-            return cachedFocusWindow
-        }
-        lastFocusQueryTime = now
-
-        return try {
-            val proc = runner(arrayOf("dumpsys", "window", "windows")) ?: return null
-            BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
-                var line = reader.readLine()
-                while (line != null) {
-                    if (line.contains("mCurrentFocus")) {
-                        val regex = Regex("""\s+u\d+\s+([^}]+)\}""")
-                        val match = regex.find(line)
-                        val name = match?.groupValues?.getOrNull(1)
-                        if (!name.isNullOrBlank() && !name.contains("com.example.netmonitor")) {
-                            proc.destroy()
-                            cachedFocusWindow = name
-                            return name
+                    if (trimmed.isNotEmpty() && !ignored.any { trimmed.contains(it, ignoreCase = true) }) {
+                        if (trimmed.contains("SurfaceView", ignoreCase = true)) {
+                            layers.add(0, trimmed) // Prioritaskan layer SurfaceView game
+                        } else if (trimmed.contains("/") || trimmed.contains("#")) {
+                            layers.add(trimmed)
                         }
                     }
                     line = reader.readLine()
                 }
             }
-            proc.destroy()
-            null
+            listProc.destroy()
         } catch (_: Exception) {
-            null
         }
+        cachedLayers = layers
+        return layers
     }
 }

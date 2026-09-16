@@ -42,7 +42,7 @@
             android:multiprocess="false"
             android:enabled="true"
             android:exported="true"
-            tools:ignore="ExportedContentProvider" />
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
         <!-- Main Activity -->
         <activity
