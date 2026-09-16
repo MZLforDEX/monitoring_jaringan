@@ -79,5 +79,40 @@ adb install -r NetworkMonitor-v0.1.6-debug.apk
 
 ---
 
+## Tentang Aplikasi
+
+**Network Monitor (Floating HUD)** adalah utilitas Android open-source yang dirancang untuk memantau performa perangkat dan konektivitas jaringan secara real-time lewat floating pill widget yang fleksibel.
+
+### Keunggulan Utama
+- **Ringan & Efisien**: Dibuat murni dengan Kotlin, tanpa library analitik, tanpa tracking, dan 100% bebas iklan.
+- **Zero Idle Drain**: Sistem otomatis menjeda kalkulasi dan komputasi metrik secara penuh saat layar mati.
+- **True Game FPS**: Membaca frame hardware compositor nyata dari `SurfaceFlinger` melalui Shizuku API tanpa memerlukan root.
+
+---
+
+## Catatan Rilis (Release Notes)
+
+Setiap pembaruan mengikuti aturan penomoran versi:
+- **Update Kecil (Minor / Patch)**: Kenaikan angka belakang (misal: `v0.1.5` ➔ `v0.1.6`).
+- **Update Besar (Major Feature)**: Kenaikan angka depan (misal: `v0.x.x` ➔ `v1.0.0`).
+
+Daftar rilis lengkap dan file APK dapat diakses di halaman [GitHub Releases](https://github.com/MZLforDEX/monitoring_jaringan/releases).
+
+### [v0.1.6] - 2026-09-16
+- **Tombol Unduh Langsung**: Menambahkan tombol badge download APK instan di bagian atas README repositori.
+- **Engine FPS Real-time**: Mengimplementasikan pembacaan delta hardware compositor SurfaceFlinger PageFlip dan layer latency berbasis monotonic clock.
+- **Integrasi Shizuku**: Menambahkan izin `INTERACT_ACROSS_USERS_FULL` pada provider Shizuku agar handshake IPC binder berjalan mulus.
+- **UI & About**: Menambahkan kartu "Tentang Aplikasi" di aplikasi dengan tautan cepat ke repositori GitHub.
+
+### [v0.1.5]
+- **Shizuku API**: Integrasi resmi Shizuku API v13.1.5 untuk membaca FPS game tanpa root fisik.
+- **Ikon Baru**: Desain ikon adaptive bertema speedometer HUD modern.
+- **Android 14+ Support**: Kompatibilitas foreground service `specialUse`.
+
+### [v0.1.0 - v0.1.4]
+- Rilis awal floating HUD overlay dengan pemantauan kecepatan unduh/unggah, ping socket, RAM, dan suhu perangkat.
+
+---
+
 ## Lisensi
 Proyek ini bersifat open-source dan bebas digunakan untuk keperluan edukasi maupun pengembangan pribadi.

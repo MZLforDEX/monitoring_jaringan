@@ -346,7 +346,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:layout_marginBottom="16dp"
             android:background="@drawable/bg_card"
             android:orientation="vertical"
             android:padding="16dp">
@@ -367,6 +366,63 @@
                 android:textColor="#9E9E9E"
                 android:textSize="12sp"
                 android:lineSpacingExtra="4dp" />
+        </LinearLayout>
+
+        <!-- Tentang Aplikasi (About) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="24dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TENTANG APLIKASI"
+                android:textColor="#888888"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Network Monitor (Floating HUD)"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvAboutVersion"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Versi: v0.1.6 (Build 6) • Lisensi: MIT"
+                android:textColor="#81C784"
+                android:textSize="12sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Aplikasi utilitas open-source untuk pemantauan throughput data, latensi, in-game FPS, konsumsi RAM, dan suhu perangkat secara real-time langsung di atas layar tanpa mengganggu aktivitas."
+                android:textColor="#9E9E9E"
+                android:textSize="12sp"
+                android:lineSpacingExtra="3dp" />
+
+            <Button
+                android:id="@+id/btnOpenGitHub"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_button_permission"
+                android:text="Kunjungi Repositori GitHub"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
     </LinearLayout>

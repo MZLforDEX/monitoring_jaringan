@@ -215,6 +215,15 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Perintah ADB berhasil disalin ke clipboard!", Toast.LENGTH_SHORT).show()
         }
 
+        findViewById<Button>(R.id.btnOpenGitHub).setOnClickListener {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/MZLforDEX/monitoring_jaringan"))
+                startActivity(intent)
+            } catch (_: Exception) {
+                Toast.makeText(this, "Tidak dapat membuka browser.", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         // Listener untuk pembaruan kustomisasi metrik secara instan
         val configChangeListener = {
             saveAndApplyConfig()
