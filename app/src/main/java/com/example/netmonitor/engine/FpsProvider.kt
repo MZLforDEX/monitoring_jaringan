@@ -73,8 +73,16 @@ class FpsProvider(private val context: Context) {
             } else {
                 val elapsedNs = frameTimeNanos - lastVsyncTimeNs
                 if (elapsedNs >= 1_000_000_000L) {
-                    val fps = ((frameCount * 1_000_000_000.0) / elapsedNs).roundToInt()
-                    currentVsyncFps = fps.coerceIn(1, 240)
+                    val rawFps = ((frameCount * 1_000_000_000.0) / elapsedNs).roundToInt()
+                    // Proteksi Anti-Stuck 1 FPS / Throttling OS:
+                    // Jika frameCount < 10 dalam 1 detik, artinya looper proses service mengalami
+                    // throttling / idle oleh sistem (misal MIUI/HyperOS battery saver saat app lain dibuka).
+                    // Tampilkan refresh rate fisik layar aktual agar tidak pernah stuck di 1 FPS.
+                    currentVsyncFps = if (rawFps >= 10) {
+                        rawFps.coerceIn(10, 240)
+                    } else {
+                        getDisplayRefreshRateNumber()
+                    }
                     frameCount = 0
                     lastVsyncTimeNs = frameTimeNanos
                 }
@@ -100,6 +108,7 @@ class FpsProvider(private val context: Context) {
 
     // Cache deteksi fokus
     private var cachedFocusedPkg: String? = null
+    private var lastFocusedPkg: String? = null
     private var lastFocusQueryTime: Long = 0L
 
     private var isTimeStatsEnabled: Boolean = false
@@ -209,28 +218,34 @@ class FpsProvider(private val context: Context) {
         }
         fpsSamplerJob?.cancel()
         fpsSamplerJob = null
+        cachedGameFps = -1
+        lastGfxFrames = -1L
+        lastGfxTimeMs = 0L
+        lastGfxPkg = null
+        cachedFocusedPkg = null
+        lastFocusedPkg = null
     }
 
     /**
      * Mengambil metrik FPS ringkas secara instan dari cache memori (< 0.001 ms).
-     * Dijamin tidak pernah memblokir thread pemanggil dan tidak akan stuck di 0 FPS.
+     * Dijamin tidak pernah memblokir thread pemanggil dan tidak akan stuck di 0 atau 1 FPS.
      */
     fun getFrameMetric(): String {
-        // 1. Jika mode True Game FPS aktif dan ada pembacaan game yang valid
+        // 1. Jika mode True Game FPS aktif dan ada pembacaan game yang valid (>= 5 FPS)
         if (isTrueFpsAvailable()) {
             val gameFps = cachedGameFps
-            if (gameFps in 1..240) {
+            if (gameFps in 5..240) {
                 return "$gameFps FPS"
             }
         }
 
-        // 2. Gunakan pembacaan hardware VSYNC aktual dari Choreographer
+        // 2. Gunakan pembacaan hardware VSYNC aktual dari Choreographer (>= 10 FPS)
         val vsyncFps = currentVsyncFps
-        if (vsyncFps in 1..240) {
+        if (vsyncFps in 10..240) {
             return "$vsyncFps FPS"
         }
 
-        // 3. Fallback refresh rate fisik layar jika baru menyala
+        // 3. Fallback refresh rate fisik layar jika proses idle / transisi sistem
         val hz = getDisplayRefreshRateNumber()
         return "$hz FPS"
     }
@@ -243,27 +258,37 @@ class FpsProvider(private val context: Context) {
             // A. Deteksi aplikasi/game yang sedang di depan layar (cepat < 15ms)
             val focusedPkg = getTopResumedPackage()
 
+            // Jika aplikasi di depan layar berganti atau kembali ke launcher, reset cache seketika
+            if (focusedPkg != lastFocusedPkg) {
+                lastFocusedPkg = focusedPkg
+                cachedGameFps = -1
+                lastGfxFrames = -1L
+                lastGfxTimeMs = 0L
+                lastGfxPkg = null
+            }
+
             // B. Jika ada aplikasi/game aktif, cek frame delta via dumpsys gfxinfo
             if (!focusedPkg.isNullOrBlank()) {
                 val gfxFps = queryGfxInfoFps(focusedPkg)
-                if (gfxFps in 1..240) {
+                if (gfxFps in 5..240) {
                     cachedGameFps = gfxFps
                     lastGameFpsTimeMs = SystemClock.elapsedRealtime()
                     return
                 }
             }
 
-            // C. Cek telemetry SurfaceFlinger timestats
+            // C. Cek telemetry SurfaceFlinger timestats jika gfxinfo tidak tersedia
             val timeStatsFps = querySurfaceFlingerTimeStats(focusedPkg)
-            if (timeStatsFps in 1..240) {
+            if (timeStatsFps in 5..240) {
                 cachedGameFps = timeStatsFps
                 lastGameFpsTimeMs = SystemClock.elapsedRealtime()
                 return
             }
 
-            // D. Jika sudah lewat 2.5 detik tanpa frame game terdeteksi, reset ke VSYNC
+            // D. Jika sudah lewat 1.8 detik tanpa frame render game aktif terdeteksi
+            // (misal game dijeda, buka menu statis, atau layar diam), reset ke VSYNC/Hz
             val now = SystemClock.elapsedRealtime()
-            if (cachedGameFps > 0 && (now - lastGameFpsTimeMs) > 2500L) {
+            if (cachedGameFps > 0 && (now - lastGameFpsTimeMs) > 1800L) {
                 cachedGameFps = -1
             }
         } catch (_: Exception) {}
@@ -275,7 +300,7 @@ class FpsProvider(private val context: Context) {
      */
     private fun getTopResumedPackage(): String? {
         val now = SystemClock.elapsedRealtime()
-        if (now - lastFocusQueryTime < 1800L && cachedFocusedPkg != null) {
+        if (now - lastFocusQueryTime < 900L && cachedFocusedPkg != null) {
             return cachedFocusedPkg
         }
         lastFocusQueryTime = now
@@ -285,7 +310,11 @@ class FpsProvider(private val context: Context) {
             val regex = Regex("""([a-zA-Z0-9._]+)/([a-zA-Z0-9._]+)""")
             val match = regex.find(output)
             val pkg = match?.groupValues?.getOrNull(1)
-            if (!pkg.isNullOrBlank() && !isIgnoredPackage(pkg)) {
+            if (!pkg.isNullOrBlank()) {
+                if (isIgnoredPackage(pkg)) {
+                    cachedFocusedPkg = null
+                    return null
+                }
                 cachedFocusedPkg = pkg
                 return pkg
             }
@@ -297,13 +326,18 @@ class FpsProvider(private val context: Context) {
             val regex = Regex("""([a-zA-Z0-9._]+)/([a-zA-Z0-9._]+)""")
             val match = regex.find(winOutput)
             val pkg = match?.groupValues?.getOrNull(1)
-            if (!pkg.isNullOrBlank() && !isIgnoredPackage(pkg)) {
+            if (!pkg.isNullOrBlank()) {
+                if (isIgnoredPackage(pkg)) {
+                    cachedFocusedPkg = null
+                    return null
+                }
                 cachedFocusedPkg = pkg
                 return pkg
             }
         }
 
-        return cachedFocusedPkg
+        cachedFocusedPkg = null
+        return null
     }
 
     private fun isIgnoredPackage(pkg: String): Boolean {
@@ -328,19 +362,29 @@ class FpsProvider(private val context: Context) {
         val currentFrames = match?.groupValues?.getOrNull(1)?.toLongOrNull() ?: return -1
 
         val nowMs = SystemClock.elapsedRealtime()
-        val prevFrames = if (pkg == lastGfxPkg) lastGfxFrames else -1L
-        val prevTime = if (pkg == lastGfxPkg) lastGfxTimeMs else 0L
+        val isSamePkg = (pkg == lastGfxPkg)
+        val prevFrames = if (isSamePkg) lastGfxFrames else -1L
+        val prevTime = if (isSamePkg) lastGfxTimeMs else 0L
 
         lastGfxFrames = currentFrames
         lastGfxTimeMs = nowMs
         lastGfxPkg = pkg
 
-        if (prevFrames >= 0L && prevTime > 0L) {
-            val elapsedMs = nowMs - prevTime
+        // Butuh minimal 1 interval sebelumnya untuk menghitung laju delta
+        if (!isSamePkg || prevFrames < 0L || prevTime <= 0L) {
+            return -1
+        }
+
+        val elapsedMs = nowMs - prevTime
+        if (elapsedMs in 400..2500) {
             val deltaFrames = currentFrames - prevFrames
-            if (elapsedMs in 400..2500 && deltaFrames >= 0L) {
+            // Proteksi Anti-Stuck 1 FPS:
+            // Jika deltaFrames < 5 (misal 0 saat layar statis atau 1 saat transisi buka aplikasi),
+            // itu BUKAN laju render game aktif, melainkan aplikasi sedang idle / statis.
+            // Kembalikan -1 agar sistem menampilkan VSYNC / refresh rate layar yang mulus.
+            if (deltaFrames >= 5) {
                 val calculatedFps = ((deltaFrames * 1000.0) / elapsedMs).roundToInt()
-                return calculatedFps.coerceIn(1, 240)
+                return calculatedFps.coerceIn(5, 240)
             }
         }
         return -1
@@ -350,6 +394,8 @@ class FpsProvider(private val context: Context) {
      * Membaca averageFPS dari SurfaceFlinger timestats telemetry (< 25ms).
      */
     private fun querySurfaceFlingerTimeStats(focusedPkg: String?): Int {
+        if (focusedPkg.isNullOrBlank()) return -1
+
         if (!isTimeStatsEnabled) {
             runShellCommand("dumpsys SurfaceFlinger --timestats -enable", timeoutMs = 250L)
             isTimeStatsEnabled = true
@@ -357,20 +403,18 @@ class FpsProvider(private val context: Context) {
 
         val output = runShellCommand("dumpsys SurfaceFlinger --timestats -dump", timeoutMs = 350L) ?: return -1
 
-        // 1. Coba cari averageFPS pada layer SurfaceView atau package game
         val lines = output.lines()
         var inTargetLayer = false
         for (line in lines) {
             val trimmed = line.trim()
             if (trimmed.startsWith("Layer:", ignoreCase = true) || trimmed.startsWith("--- Layer:", ignoreCase = true)) {
-                inTargetLayer = (!focusedPkg.isNullOrBlank() && trimmed.contains(focusedPkg, ignoreCase = true)) ||
-                        trimmed.contains("SurfaceView", ignoreCase = true)
+                inTargetLayer = trimmed.contains(focusedPkg, ignoreCase = true)
             } else if (inTargetLayer) {
                 if (trimmed.startsWith("averageFPS", ignoreCase = true) || trimmed.startsWith("average_fps", ignoreCase = true)) {
                     val valueStr = trimmed.substringAfter("=").substringAfter(":").trim()
                     val fpsDouble = valueStr.toDoubleOrNull()
-                    if (fpsDouble != null && fpsDouble > 0.0) {
-                        return fpsDouble.roundToInt().coerceIn(1, 240)
+                    if (fpsDouble != null && fpsDouble >= 5.0) {
+                        return fpsDouble.roundToInt().coerceIn(5, 240)
                     }
                 }
             }
@@ -393,6 +437,9 @@ class FpsProvider(private val context: Context) {
 
             try {
                 proc.outputStream.close()
+            } catch (_: Exception) {}
+            try {
+                proc.errorStream.close()
             } catch (_: Exception) {}
 
             var output: String? = null

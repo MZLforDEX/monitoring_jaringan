@@ -400,7 +400,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="Versi: v0.1.9 (Build 9) • Lisensi: MIT"
+                android:text="Versi: v0.2.0 (Build 10) • Lisensi: MIT"
                 android:textColor="#81C784"
                 android:textSize="12sp" />
 

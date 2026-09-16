@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.netmonitor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.1.9"
+        versionCode = 10
+        versionName = "0.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
