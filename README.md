@@ -1,68 +1,70 @@
-# System & Network Monitor (Floating HUD & Foreground Service)
+# Network Monitor (Floating HUD)
 
-Aplikasi pemantau performa sistem dan jaringan (*floating overlay pill widget*) untuk Android yang dirancang dengan prinsip **efisiensi tinggi, zero-lag, dan hemat baterai**.
+Aplikasi Android untuk memantau lalu lintas jaringan dan performa perangkat secara real-time lewat widget melayang (*floating overlay*).
 
-**Versi:** `v0.1.5`
-
----
-
-## 🚀 Fitur Utama
-
-- **Real-Time Network Speed**: Menghitung kecepatan Download (↓) dan Upload (↑) secara presisi menggunakan `TrafficStats` Linux kernel dengan jam monotonic tanpa false spike.
-- **Accurate Latency (RTT)**: Mengukur ping/latensi via TCP handshake port 53 (`1.1.1.1`) murni tanpa eksekusi shell (`no Runtime.exec("ping")`).
-- **Hybrid Frame Rate & Refresh Rate (FPS / Hz)**:
-  - **Display Refresh Rate (Hz)**: Bawaan aktif secara instan tanpa root dan tanpa ADB (0% konsumsi CPU & baterai).
-  - **True Game FPS**: Mengukur render frame actual dari SurfaceFlinger compositor secara presisi melalui integrasi **Shizuku API** (bebas root & lolos batasan SELinux) atau izin `android.permission.DUMP`.
-- **RAM Usage Monitor**: Membaca persentase penggunaan memori fisik (RAM %) secara instan tanpa alokasi memori heap berlebih (*reusable MemoryInfo*).
-- **Device & Battery Temperature**: Membaca suhu perangkat (°C) via cached sticky broadcast tanpa membebani CPU.
-- **Kustomisasi Metrik Penuh**: Pengguna dapat memilih dan mengatur metrik apa saja (Download, Upload, Ping, FPS/Hz, RAM, Suhu) yang ingin dimunculkan pada widget melayang langsung dari aplikasi utama secara instan.
-- **Floating Drag & Drop Widget**: Pill overlay elegan yang dapat digeser bebas di atas aplikasi lain tanpa memblokir virtual keyboard (`FLAG_NOT_FOCUSABLE`).
-- **Modern Adaptive App Icon**: Ikon aplikasi modern bertema HUD Network Metering & Speedometer.
-- **Zero Compute saat Layar Mati**: Secara otomatis menjeda total komputasi data, socket ping, dan sensor saat layar mati (`ACTION_SCREEN_OFF`), menghemat daya baterai secara maksimal.
-- **Kepatuhan Android 14+**: Terintegrasi penuh dengan Foreground Service type `specialUse` dan izin runtime modern (`registerForActivityResult`).
+[![Android](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)](https://developer.android.com)
+[![Kotlin](https://img.shields.io/badge/Language-Kotlin-purple.svg)](https://kotlinlang.org)
+[![Version](https://img.shields.io/badge/Release-v0.1.5-blue.svg)](https://github.com/MZLforDEX/monitoring_jaringan)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
 ---
 
-## ⚡ Aktivasi True Game FPS
+## Fitur
 
-### Metode 1: Shizuku (Direkomendasikan - Tanpa PC & Tanpa Root)
-1. Buka aplikasi **Shizuku** di HP Anda dan pastikan status servicenya aktif (via Wireless Debugging).
+- **Kecepatan Jaringan**: Kecepatan download (↓) dan upload (↑) aktual per detik.
+- **Latensi / Ping**: Pengukuran RTT via TCP socket (`1.1.1.1:53`).
+- **Frame Rate (FPS / Hz)**:
+  - *Default*: Refresh rate layar fisik (Hz) tanpa izin tambahan.
+  - *Game Mode*: In-game FPS aktual via Shizuku / SurfaceFlinger.
+- **Penggunaan RAM**: Persentase memori RAM perangkat yang terpakai.
+- **Suhu Baterai**: Suhu perangkat saat ini dalam derajat Celsius (°C).
+- **Kustomisasi Tampilan**: Memilih metrik mana saja yang ingin dimunculkan pada widget melayang.
+- **Floating Widget**: Posisi bebas digeser, tidak menghalangi keyboard, dan otomatis jeda saat layar mati untuk menghemat daya.
+
+---
+
+## Mode In-Game FPS
+
+Secara default, Android membatasi pembacaan frame rate aplikasi lain melalui kebijakan SELinux. Agar widget dapat menampilkan **FPS game aktual** (bukan sekadar Hz layar fisik), gunakan salah satu opsi berikut:
+
+### 1. Menggunakan Shizuku (Rekomendasi - Tanpa Root & Tanpa PC)
+1. Buka aplikasi **Shizuku** dan pastikan status servicenya aktif (via Wireless Debugging).
 2. Buka aplikasi **Network Monitor**.
-3. Di bagian kartu *Informasi Mode FPS*, ketuk tombol **"Minta Izin Shizuku"** dan pilih **Izinkan selalu**.
-4. Mode akan langsung otomatis berubah menjadi **True Game FPS (Shizuku Privileged)**.
+3. Ketuk tombol **Minta Izin Shizuku**, lalu pilih **Izinkan selalu**.
+4. Mode akan langsung berganti ke *True Game FPS*.
 
-### Metode 2: Perintah ADB Manual di PC (Alternatif)
-Jika tidak memakai Shizuku, Anda tetap dapat memberikan izin sistem melalui ADB:
+### 2. Melalui ADB (Via Komputer)
+Sambungkan perangkat dengan USB Debugging aktif, lalu jalankan:
 ```bash
 adb shell pm grant com.example.netmonitor android.permission.DUMP
 ```
 
 ---
 
-## 🛠️ Spesifikasi Teknis
+## Build & Instalasi
 
-- **Bahasa**: Kotlin Murni
-- **Min SDK**: Android 8.0 (API 26)
-- **Target SDK**: Android 14 / 15 (API 34 / 35)
-- **Arsitektur**: Foreground Service, Kotlin Coroutines, Native WindowManager, Shizuku API
-- **Versi Rilis**: `v0.1.5`
+### Persyaratan
+- Android SDK (API 26 s/d 35)
+- JDK 17
+- Gradle 8.x
 
----
-
-## 📦 Menjalankan & Membangun Proyek
-
-### Build Debug APK:
+### Kompilasi dari Source
 ```bash
+# Clone repository
+git clone https://github.com/MZLforDEX/monitoring_jaringan.git
+cd monitoring_jaringan
+
+# Build APK debug
 ./gradlew assembleDebug
 ```
 Output APK berada di `app/build/outputs/apk/debug/app-debug.apk`.
 
-### Instalasi ke Perangkat:
+### Pasang ke Perangkat
 ```bash
 adb install -r NetworkMonitor-v0.1.5-debug.apk
 ```
 
 ---
 
-## 📄 Lisensi
-Didistribusikan di bawah lisensi open-source untuk keperluan pengembangan dan pemantauan performa sistem.
+## Lisensi
+Proyek ini bersifat open-source dan bebas digunakan untuk keperluan edukasi maupun pengembangan pribadi.
