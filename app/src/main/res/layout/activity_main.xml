@@ -24,7 +24,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Floating HUD v0.1.6 • Super Ringan &amp; Hemat Baterai"
+            android:text="Floating HUD v0.1.7 • Super Ringan &amp; Hemat Baterai"
             android:textColor="#888888"
             android:textSize="13sp" />
 
@@ -400,7 +400,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="Versi: v0.1.6 (Build 6) • Lisensi: MIT"
+                android:text="Versi: v0.1.7 (Build 7) • Lisensi: MIT"
                 android:textColor="#81C784"
                 android:textSize="12sp" />
 
