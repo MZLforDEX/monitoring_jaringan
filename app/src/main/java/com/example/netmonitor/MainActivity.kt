@@ -108,10 +108,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Daftarkan listener status & izin Shizuku
+        // Daftarkan listener status & izin Shizuku (Sticky agar langsung memicu jika binder sudah ada)
         try {
             rikka.shizuku.Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
-            rikka.shizuku.Shizuku.addBinderReceivedListener(shizukuBinderReceivedListener)
+            rikka.shizuku.Shizuku.addBinderReceivedListenerSticky(shizukuBinderReceivedListener)
             rikka.shizuku.Shizuku.addBinderDeadListener(shizukuBinderDeadListener)
         } catch (_: Throwable) {
         }
@@ -190,11 +190,21 @@ class MainActivity : ComponentActivity() {
             if (ShizukuManager.isAvailable()) {
                 ShizukuManager.requestPermission(SHIZUKU_REQ_CODE)
             } else {
-                Toast.makeText(
-                    this,
-                    "Shizuku tidak terdeteksi aktif. Buka aplikasi Shizuku dan jalankan servicenya terlebih dahulu.",
-                    Toast.LENGTH_LONG
-                ).show()
+                val launchIntent = packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+                if (launchIntent != null) {
+                    startActivity(launchIntent)
+                    Toast.makeText(
+                        this,
+                        "Membuka Shizuku. Pastikan statusnya 'Running', lalu kembali ke aplikasi ini.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        this,
+                        "Aplikasi Shizuku belum terpasang di perangkat ini.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
 
@@ -339,6 +349,7 @@ class MainActivity : ComponentActivity() {
         // Status Shizuku & Mode FPS / Refresh Rate
         val isShizukuAvail = fpsProvider.isShizukuAvailable()
         val isShizukuGranted = fpsProvider.isShizukuGranted()
+        val isShizukuAppInstalled = packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api") != null
 
         when {
             isShizukuGranted -> {
@@ -349,6 +360,13 @@ class MainActivity : ComponentActivity() {
             isShizukuAvail -> {
                 tvShizukuStatus.text = "Status Shizuku: Berjalan (Belum Diizinkan)"
                 tvShizukuStatus.setTextColor(0xFFFFD54F.toInt())
+                btnRequestShizuku.text = "Minta Izin Shizuku (Aktifkan)"
+                btnRequestShizuku.visibility = View.VISIBLE
+            }
+            isShizukuAppInstalled -> {
+                tvShizukuStatus.text = "Status Shizuku: Terpasang (Service Belum Berjalan)"
+                tvShizukuStatus.setTextColor(0xFFFFD54F.toInt())
+                btnRequestShizuku.text = "Buka Aplikasi Shizuku"
                 btnRequestShizuku.visibility = View.VISIBLE
             }
             else -> {
