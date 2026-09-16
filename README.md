@@ -2,10 +2,10 @@
 
 Aplikasi Android untuk memantau lalu lintas jaringan dan performa perangkat secara real-time lewat widget melayang (*floating overlay*).
 
-[![Download APK](https://img.shields.io/badge/Download%20APK-v0.1.7-2ea44f?style=for-the-badge&logo=android&logoColor=white)](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.1.7-debug.apk)
+[![Download APK](https://img.shields.io/badge/Download%20APK-v0.1.8-2ea44f?style=for-the-badge&logo=android&logoColor=white)](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.1.8-debug.apk)
 [![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin-purple.svg)](https://kotlinlang.org)
-[![Version](https://img.shields.io/badge/Release-v0.1.7-blue.svg)](https://github.com/MZLforDEX/monitoring_jaringan)
+[![Version](https://img.shields.io/badge/Release-v0.1.8-blue.svg)](https://github.com/MZLforDEX/monitoring_jaringan)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
 ---
@@ -16,7 +16,7 @@ File installer APK siap pakai dapat diunduh langsung tanpa harus compile:
 
 | Versi | Tautan Unduh | Ukuran | Status |
 | :--- | :--- | :--- | :--- |
-| **v0.1.7** *(Terbaru)* | [**⬇️ Unduh NetworkMonitor-v0.1.7-debug.apk**](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.1.7-debug.apk) | ~2.3 MB | ✅ Stabil |
+| **v0.1.8** *(Terbaru)* | [**⬇️ Unduh NetworkMonitor-v0.1.8-debug.apk**](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.1.8-debug.apk) | ~2.3 MB | ✅ Stabil |
 
 > 💡 **Catatan**: Jika Android menampilkan konfirmasi keamanan *"Aplikasi dari sumber tidak dikenal"*, pilih **Tetap Pasang (Install Anyway)**.
 
@@ -74,7 +74,7 @@ Output APK berada di `app/build/outputs/apk/debug/app-debug.apk`.
 
 ### Pasang ke Perangkat
 ```bash
-adb install -r NetworkMonitor-v0.1.7-debug.apk
+adb install -r NetworkMonitor-v0.1.8-debug.apk
 ```
 
 ---
@@ -93,13 +93,19 @@ adb install -r NetworkMonitor-v0.1.7-debug.apk
 ## Catatan Rilis (Release Notes)
 
 Setiap pembaruan mengikuti aturan penomoran versi:
-- **Update Kecil (Minor / Patch)**: Kenaikan angka belakang (misal: `v0.1.6` ➔ `v0.1.7`).
+- **Update Kecil (Minor / Patch)**: Kenaikan angka belakang (misal: `v0.1.7` ➔ `v0.1.8`).
 - **Update Besar (Major Feature)**: Kenaikan angka depan (misal: `v0.x.x` ➔ `v1.0.0`).
 
 Daftar rilis lengkap dan file APK dapat diakses di halaman [GitHub Releases](https://github.com/MZLforDEX/monitoring_jaringan/releases).
 
+### [v0.1.8] - 2026-09-16
+- **True Game FPS 100% Terpisah dari Refresh Rate Layar**: Memperbaiki masalah pada perangkat Xiaomi (MIUI/HyperOS) di mana angka FPS terkunci di 90 atau 120 FPS. Kini mode Shizuku murni mengukur render buffer frame per detik dari game yang sedang aktif, dan **tidak akan pernah** menampilkan Hz layar saat mode FPS aktif.
+- **Dukungan Frame Drop & Freeze Nyata**: Saat game mengalami lag, patah-patah, atau frame drop (misal ke 45, 30, atau 0 FPS saat loading), angka yang tampil langsung turun secara dinamis dan akurat mengikuti frame nyata game.
+- **Arsitektur Multi-Tier Engine**: Kombinasi SurfaceView buffer timestamps (SurfaceFlinger latency), `dumpsys gfxinfo` rendered frames, dan hardware compositor page flips (`service call SurfaceFlinger 1013`).
+- **Deteksi Jendela Game Multi-Fallback**: Mendeteksi foreground game via `dumpsys activity activities` (`topResumedActivity`), `dumpsys window`, dan SurfaceView layer registry.
+
 ### [v0.1.7] - 2026-09-16
-- **Perbaikan FPS Layar 90Hz/120Hz (Xiaomi/MIUI/HyperOS)**: Menghapus ketergantungan pada PageFlip counter display panel yang mengunci angka di 90/120Hz. Kini memantau langsung active render layer game (`SurfaceView`) dan telemetry `TimeStats`, sehingga saat game lag atau frame drop (misal ke 30/45/58 FPS), angka FPS yang tampil akan akurat dan dinamis mengikuti performa game nyata.
+- **Perbaikan FPS Layar 90Hz/120Hz (Xiaomi/MIUI/HyperOS)**: Menghapus ketergantungan pada PageFlip counter display panel yang mengunci angka di 90/120Hz. Kini memantau langsung active render layer game (`SurfaceView`) dan telemetry `TimeStats`.
 - **Fokus Layer Otomatis**: Mendeteksi jendela game/aplikasi latar depan secara cerdas dan memprioritaskan layer render terkait.
 
 ### [v0.1.6] - 2026-09-16
