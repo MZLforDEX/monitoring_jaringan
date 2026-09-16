@@ -57,17 +57,22 @@ object ShizukuManager {
     /**
      * Menjalankan perintah shell dengan identitas shell/ADB melalui Shizuku.
      */
+    private var newProcessMethod: java.lang.reflect.Method? = null
+
     fun execute(command: Array<String>): Process? {
         if (!hasPermission()) return null
         return try {
-            val method = Shizuku::class.java.getDeclaredMethod(
-                "newProcess",
-                Array<String>::class.java,
-                Array<String>::class.java,
-                String::class.java
-            )
-            method.isAccessible = true
-            method.invoke(null, command, null, null) as? Process
+            if (newProcessMethod == null) {
+                val method = Shizuku::class.java.getDeclaredMethod(
+                    "newProcess",
+                    Array<String>::class.java,
+                    Array<String>::class.java,
+                    String::class.java
+                )
+                method.isAccessible = true
+                newProcessMethod = method
+            }
+            newProcessMethod?.invoke(null, command, null, null) as? Process
         } catch (e: Throwable) {
             Log.e(TAG, "Gagal menjalankan proses Shizuku: ${e.message}")
             null

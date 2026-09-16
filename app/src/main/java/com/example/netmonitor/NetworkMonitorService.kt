@@ -226,6 +226,7 @@ class NetworkMonitorService : Service() {
     private fun resumeMonitoring() {
         pauseMonitoring()
         trafficCalculator.reset()
+        fpsProvider.startMonitoring()
 
         // 1. Loop Metrik Utama (Kecepatan Jaringan, RAM, Suhu setiap 1.000 ms)
         metricsMonitorJob = serviceScope.launch {
@@ -290,6 +291,7 @@ class NetworkMonitorService : Service() {
 
     @Synchronized
     private fun pauseMonitoring() {
+        fpsProvider.stopMonitoring()
         metricsMonitorJob?.cancel()
         metricsMonitorJob = null
 
