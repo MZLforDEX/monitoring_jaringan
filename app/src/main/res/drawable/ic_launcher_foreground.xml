@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Speedometer HUD Gauge Arc -->
+    <path
+        android:pathData="M35,68 A23,23 0 1,1 73,68"
+        android:strokeWidth="4"
+        android:strokeColor="#00E5FF"
+        android:strokeLineCap="round" />
+
+    <!-- Gauge Accent Track (Dotted / Partial Arc) -->
+    <path
+        android:pathData="M39,39 A23,23 0 0,1 69,39"
+        android:strokeWidth="2.5"
+        android:strokeColor="#00E676"
+        android:strokeLineCap="round" />
+
+    <!-- Pulse Waveform (Network Latency / FPS Beat) -->
+    <path
+        android:pathData="M31,54 L42,54 L47,44 L53,64 L58,49 L62,54 L77,54"
+        android:strokeWidth="3.5"
+        android:strokeColor="#00E676"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Download Indicator Arrow (Left Top) -->
+    <path
+        android:pathData="M44,30 L44,39 M41,36 L44,39 L47,36"
+        android:strokeWidth="2.2"
+        android:strokeColor="#00E5FF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Upload Indicator Arrow (Right Top) -->
+    <path
+        android:pathData="M64,39 L64,30 M61,33 L64,30 L67,33"
+        android:strokeWidth="2.2"
+        android:strokeColor="#FFD54F"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Center Pulse Core Dot -->
+    <path
+        android:pathData="M54,54m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0"
+        android:fillColor="#FFFFFF" />
+
+</vector>

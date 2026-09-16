@@ -20,13 +20,19 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.example.netmonitor.engine.FpsProvider
+import com.example.netmonitor.engine.ShizukuManager
 import com.example.netmonitor.model.MonitorConfig
+import rikka.shizuku.Shizuku
 
 /**
  * Aktivitas utama untuk konfigurasi performa HUD, verifikasi izin,
  * pengaturan kustomisasi metrik yang ditampilkan, dan kontrol Service.
  */
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        private const val SHIZUKU_REQ_CODE = 2001
+    }
 
     private lateinit var viewStatusDot: View
     private lateinit var tvStatusTitle: TextView
@@ -45,8 +51,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var cbRam: CheckBox
     private lateinit var cbTemp: CheckBox
 
-    // Status FPS & ADB Command View
+    // Status FPS & ADB Command View & Shizuku
     private lateinit var tvFpsStatus: TextView
+    private lateinit var tvShizukuStatus: TextView
+    private lateinit var btnRequestShizuku: Button
     private lateinit var tvAdbCommand: TextView
     private lateinit var fpsProvider: FpsProvider
 
@@ -71,13 +79,56 @@ class MainActivity : ComponentActivity() {
             updateUiState()
         }
 
+    // 3. Listener interaksi Shizuku
+    private val shizukuPermissionListener =
+        rikka.shizuku.Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+            if (requestCode == SHIZUKU_REQ_CODE) {
+                if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(
+                        this,
+                        "Izin Shizuku berhasil diberikan! True Game FPS aktif.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(this, "Izin Shizuku ditolak.", Toast.LENGTH_SHORT).show()
+                }
+                updateUiState()
+            }
+        }
+
+    private val shizukuBinderReceivedListener = rikka.shizuku.Shizuku.OnBinderReceivedListener {
+        runOnUiThread { updateUiState() }
+    }
+
+    private val shizukuBinderDeadListener = rikka.shizuku.Shizuku.OnBinderDeadListener {
+        runOnUiThread { updateUiState() }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Daftarkan listener status & izin Shizuku
+        try {
+            rikka.shizuku.Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
+            rikka.shizuku.Shizuku.addBinderReceivedListener(shizukuBinderReceivedListener)
+            rikka.shizuku.Shizuku.addBinderDeadListener(shizukuBinderDeadListener)
+        } catch (_: Throwable) {
+        }
+
         initViews()
         loadCustomConfig()
         setupListeners()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            rikka.shizuku.Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
+            rikka.shizuku.Shizuku.removeBinderReceivedListener(shizukuBinderReceivedListener)
+            rikka.shizuku.Shizuku.removeBinderDeadListener(shizukuBinderDeadListener)
+        } catch (_: Throwable) {
+        }
     }
 
     override fun onResume() {
@@ -103,6 +154,8 @@ class MainActivity : ComponentActivity() {
         cbTemp = findViewById(R.id.cbTemp)
 
         tvFpsStatus = findViewById(R.id.tvFpsStatus)
+        tvShizukuStatus = findViewById(R.id.tvShizukuStatus)
+        btnRequestShizuku = findViewById(R.id.btnRequestShizuku)
         tvAdbCommand = findViewById(R.id.tvAdbCommand)
         fpsProvider = FpsProvider(this)
     }
@@ -131,6 +184,18 @@ class MainActivity : ComponentActivity() {
 
         btnToggleService.setOnClickListener {
             handleToggleService()
+        }
+
+        btnRequestShizuku.setOnClickListener {
+            if (ShizukuManager.isAvailable()) {
+                ShizukuManager.requestPermission(SHIZUKU_REQ_CODE)
+            } else {
+                Toast.makeText(
+                    this,
+                    "Shizuku tidak terdeteksi aktif. Buka aplikasi Shizuku dan jalankan servicenya terlebih dahulu.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
 
         tvAdbCommand.setOnClickListener {
@@ -271,12 +336,32 @@ class MainActivity : ComponentActivity() {
             btnToggleService.setBackgroundResource(R.drawable.bg_button_start)
         }
 
-        // Status Mode FPS / Refresh Rate
-        if (fpsProvider.isDumpPermissionGranted()) {
-            tvFpsStatus.text = "Mode Aktif: True Game FPS (SurfaceFlinger Latency)"
+        // Status Shizuku & Mode FPS / Refresh Rate
+        val isShizukuAvail = fpsProvider.isShizukuAvailable()
+        val isShizukuGranted = fpsProvider.isShizukuGranted()
+
+        when {
+            isShizukuGranted -> {
+                tvShizukuStatus.text = "Status Shizuku: Aktif & Diizinkan (Akses Shell Terbuka)"
+                tvShizukuStatus.setTextColor(0xFF81C784.toInt())
+                btnRequestShizuku.visibility = View.GONE
+            }
+            isShizukuAvail -> {
+                tvShizukuStatus.text = "Status Shizuku: Berjalan (Belum Diizinkan)"
+                tvShizukuStatus.setTextColor(0xFFFFD54F.toInt())
+                btnRequestShizuku.visibility = View.VISIBLE
+            }
+            else -> {
+                tvShizukuStatus.text = "Status Shizuku: Tidak Berjalan / Belum Terpasang"
+                tvShizukuStatus.setTextColor(0xFF9E9E9E.toInt())
+                btnRequestShizuku.visibility = View.GONE
+            }
+        }
+
+        tvFpsStatus.text = fpsProvider.getActiveModeDescription()
+        if (fpsProvider.isTrueFpsAvailable()) {
             tvFpsStatus.setTextColor(0xFF81C784.toInt())
         } else {
-            tvFpsStatus.text = "Mode Aktif: Display Refresh Rate (Hz)"
             tvFpsStatus.setTextColor(0xFFFFD54F.toInt())
         }
     }

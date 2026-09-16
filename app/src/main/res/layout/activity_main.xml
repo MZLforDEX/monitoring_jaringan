@@ -290,10 +290,32 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/tvShizukuStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Bawaan tanpa root: Membaca frekuensi refresh layar aktif (Hz) secara real-time dan 0% beban baterai.\n\nUntuk membuka True Game FPS (in-game frame actual antar aplikasi), berikan izin DUMP via ADB:"
+                android:layout_marginTop="6dp"
+                android:text="Status Shizuku: Memeriksa..."
+                android:textColor="#9E9E9E"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnRequestShizuku"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_button_start"
+                android:text="Minta Izin Shizuku (Rekomendasi)"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Shizuku memberikan hak shell ADB langsung di perangkat tanpa root, melewati batasan SELinux untuk mengukur True Game FPS secara akurat.\n\nAlternatif via ADB manual di PC:"
                 android:textColor="#9E9E9E"
                 android:textSize="12sp"
                 android:lineSpacingExtra="3dp" />
