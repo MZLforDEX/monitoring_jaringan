@@ -2,10 +2,23 @@
 
 Aplikasi Android untuk memantau lalu lintas jaringan dan performa perangkat secara real-time lewat widget melayang (*floating overlay*).
 
-[![Android](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)](https://developer.android.com)
+[![Download APK](https://img.shields.io/badge/Download%20APK-v0.1.6-2ea44f?style=for-the-badge&logo=android&logoColor=white)](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.1.6-debug.apk)
+[![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin-purple.svg)](https://kotlinlang.org)
-[![Version](https://img.shields.io/badge/Release-v0.1.5-blue.svg)](https://github.com/MZLforDEX/monitoring_jaringan)
+[![Version](https://img.shields.io/badge/Release-v0.1.6-blue.svg)](https://github.com/MZLforDEX/monitoring_jaringan)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
+
+---
+
+### 📥 Unduh Langsung (Direct Download)
+
+File installer APK siap pakai dapat diunduh langsung tanpa harus compile:
+
+| Versi | Tautan Unduh | Ukuran | Status |
+| :--- | :--- | :--- | :--- |
+| **v0.1.6** *(Terbaru)* | [**⬇️ Unduh NetworkMonitor-v0.1.6-debug.apk**](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.1.6-debug.apk) | ~2.3 MB | ✅ Stabil |
+
+> 💡 **Catatan**: Jika Android menampilkan konfirmasi keamanan *"Aplikasi dari sumber tidak dikenal"*, pilih **Tetap Pasang (Install Anyway)**.
 
 ---
 
@@ -61,7 +74,7 @@ Output APK berada di `app/build/outputs/apk/debug/app-debug.apk`.
 
 ### Pasang ke Perangkat
 ```bash
-adb install -r NetworkMonitor-v0.1.5-debug.apk
+adb install -r NetworkMonitor-v0.1.6-debug.apk
 ```
 
 ---
