@@ -27,6 +27,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.example.netmonitor.NetworkMonitorService
 import com.example.netmonitor.R
 import com.example.netmonitor.engine.DeviceStatsProvider
+import com.example.netmonitor.model.MonitorConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -61,6 +62,11 @@ class ChargingAodActivity : ComponentActivity() {
     private lateinit var tvAodWatt: TextView
     private lateinit var tvAodBattery: TextView
     private lateinit var tvAodDetails: TextView
+    private lateinit var tvAodHint: TextView
+
+    private var glanceDurationSec: Int = MonitorConfig.AOD_DURATION_10_SEC
+    private var remainingGlanceSeconds: Int = MonitorConfig.AOD_DURATION_10_SEC
+    private var countdownJob: Job? = null
 
     private lateinit var deviceStatsProvider: DeviceStatsProvider
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -120,6 +126,10 @@ class ChargingAodActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val config = MonitorConfig.load(this)
+        glanceDurationSec = config.aodGlanceDurationSec
+        remainingGlanceSeconds = glanceDurationSec
+
         configureWindowAndImmersive()
         setContentView(R.layout.layout_charging_aod)
 
@@ -127,6 +137,7 @@ class ChargingAodActivity : ComponentActivity() {
         setupGestureDetection()
         registerSystemReceiver()
         startStatsUpdateLoop()
+        startGlanceCountdown()
 
         // Mulai timer proteksi anti burn-in
         mainHandler.postDelayed(burnInShiftRunnable, BURN_IN_SHIFT_INTERVAL_MS)
@@ -226,6 +237,7 @@ class ChargingAodActivity : ComponentActivity() {
         tvAodWatt = findViewById(R.id.tvAodWatt)
         tvAodBattery = findViewById(R.id.tvAodBattery)
         tvAodDetails = findViewById(R.id.tvAodDetails)
+        tvAodHint = findViewById(R.id.tvAodHint)
         deviceStatsProvider = DeviceStatsProvider(this)
 
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
@@ -252,13 +264,37 @@ class ChargingAodActivity : ComponentActivity() {
             }
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                return super.onSingleTapConfirmed(e)
+                if (glanceDurationSec > 0) {
+                    remainingGlanceSeconds = glanceDurationSec
+                    tvAodHint.text = "Layar mati dalam ${remainingGlanceSeconds}d demi cas 65W • Ketuk untuk reset"
+                }
+                return true
             }
         })
 
         findViewById<View>(R.id.rootAod).setOnTouchListener { _, event ->
             gestureDetector.onTouchEvent(event)
             true
+        }
+    }
+
+    private fun startGlanceCountdown() {
+        countdownJob?.cancel()
+        if (glanceDurationSec == MonitorConfig.AOD_DURATION_ALWAYS) {
+            tvAodHint.text = "Selalu Menyala • Ketuk 2x atau usap untuk keluar"
+            return
+        }
+
+        countdownJob = activityScope.launch {
+            while (isActive && remainingGlanceSeconds > 0) {
+                tvAodHint.text = "Layar mati dalam ${remainingGlanceSeconds}d demi cas 65W • Ketuk untuk reset"
+                delay(1000L)
+                remainingGlanceSeconds--
+            }
+            if (isActive && remainingGlanceSeconds <= 0) {
+                // Waktu Smart Glance habis, matikan layar total agar kernel mengaktifkan fast charging 65W penuh
+                finish()
+            }
         }
     }
 
@@ -350,9 +386,23 @@ class ChargingAodActivity : ComponentActivity() {
         }
     }
 
+    override fun finish() {
+        @Suppress("DEPRECATION")
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        super.finish()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         mainHandler.removeCallbacksAndMessages(null)
+        countdownJob?.cancel()
+        countdownJob = null
         updateJob?.cancel()
         activityScope.cancel()
 

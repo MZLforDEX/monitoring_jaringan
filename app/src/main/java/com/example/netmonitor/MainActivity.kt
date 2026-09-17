@@ -130,6 +130,11 @@ class MainActivity : ComponentActivity() {
     private lateinit var cbChargingAod: CheckBox
     private lateinit var btnTestAod: Button
 
+    private lateinit var rgAodGlanceDuration: RadioGroup
+    private lateinit var rbAodGlance10s: RadioButton
+    private lateinit var rbAodGlance30s: RadioButton
+    private lateinit var rbAodGlanceAlways: RadioButton
+
     // Status FPS & ADB Command View & Shizuku
     private lateinit var tvFpsStatus: TextView
     private lateinit var tvShizukuStatus: TextView
@@ -316,6 +321,11 @@ class MainActivity : ComponentActivity() {
         cbChargingAod = findViewById(R.id.cbChargingAod)
         btnTestAod = findViewById(R.id.btnTestAod)
 
+        rgAodGlanceDuration = findViewById(R.id.rgAodGlanceDuration)
+        rbAodGlance10s = findViewById(R.id.rbAodGlance10s)
+        rbAodGlance30s = findViewById(R.id.rbAodGlance30s)
+        rbAodGlanceAlways = findViewById(R.id.rbAodGlanceAlways)
+
         // FPS & Shizuku
         tvFpsStatus = findViewById(R.id.tvFpsStatus)
         tvShizukuStatus = findViewById(R.id.tvShizukuStatus)
@@ -372,6 +382,12 @@ class MainActivity : ComponentActivity() {
         cbWatt.isChecked = config.showWatt
         cbShowLockscreen.isChecked = config.showOnLockscreen
         cbChargingAod.isChecked = config.enableChargingAod
+
+        when (config.aodGlanceDurationSec) {
+            MonitorConfig.AOD_DURATION_30_SEC -> rbAodGlance30s.isChecked = true
+            MonitorConfig.AOD_DURATION_ALWAYS -> rbAodGlanceAlways.isChecked = true
+            else -> rbAodGlance10s.isChecked = true
+        }
 
         // Sinkronisasi live preview awal
         updateLivePreview(config)
@@ -455,6 +471,7 @@ class MainActivity : ComponentActivity() {
         cbWatt.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
         cbShowLockscreen.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
         cbChargingAod.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        rgAodGlanceDuration.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
 
         btnTestAod.setOnClickListener {
             val aodIntent = Intent(this, com.example.netmonitor.ui.ChargingAodActivity::class.java)
@@ -565,6 +582,12 @@ class MainActivity : ComponentActivity() {
             else -> MonitorConfig.CORNER_RADIUS_PILL
         }
 
+        val aodGlanceDuration = when {
+            rbAodGlance30s.isChecked -> MonitorConfig.AOD_DURATION_30_SEC
+            rbAodGlanceAlways.isChecked -> MonitorConfig.AOD_DURATION_ALWAYS
+            else -> MonitorConfig.AOD_DURATION_10_SEC
+        }
+
         val newConfig = MonitorConfig(
             showDownload = cbDownload.isChecked,
             showUpload = cbUpload.isChecked,
@@ -579,7 +602,8 @@ class MainActivity : ComponentActivity() {
             cornerRadiusDp = cornerRadiusDp,
             showQuickBoost = cbQuickBoost.isChecked,
             showOnLockscreen = cbShowLockscreen.isChecked,
-            enableChargingAod = cbChargingAod.isChecked
+            enableChargingAod = cbChargingAod.isChecked,
+            aodGlanceDurationSec = aodGlanceDuration
         )
 
         MonitorConfig.save(this, newConfig)

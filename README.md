@@ -130,6 +130,20 @@ Setiap pembaruan mengikuti aturan penomoran versi:
 
 Daftar rilis lengkap dan file APK dapat diakses di halaman [GitHub Releases](https://github.com/MZLforDEX/monitoring_jaringan/releases).
 
+### [v0.3.1] - 2026-09-18
+- **Fitur Baru Monitoring Daya Pengisian Baterai Real-Time (Watt Cas)**:
+  - Pembacaan voltase (V), kuat arus (mA), dan total watt (W) aktual secara real-time dari kernel Linux `/sys/class/power_supply` & `BatteryManager`.
+  - Tampilan otomatis pada floating overlay saat kabel charger terhubung (misal `⚡ 65.0W`, `⚡ 33.0W`, `⚡ 18.0W`).
+  - Klasifikasi kecepatan pengisian cerdas: *Hyper Charge* (≥45W), *Turbo Charge* (≥25W), *Fast Charge* (≥15W), dan *Standar*.
+- **Mode AOD Smart Glance (Solusi Hardware Fast Charging 65W Layar Mati)**:
+  - Mengatasi pembatasan arus kernel OEM (di mana daya cas dibatasi ke 1.9W jika layar hidup dan naik ke 65W jika layar mati).
+  - **Smart Glance 10 Detik (Default & Rekomendasi)**: AOD menyala selama 10 detik saat charger dicolokkan atau saat layar dikunci untuk menampilkan watt live awal, lalu layar **otomatis padam total (`Display.STATE_OFF`)** agar sistem pengisian 65W dapat bekerja maksimal tanpa batas.
+  - Pilihan durasi fleksibel di menu pengaturan: *Smart Glance 10 Detik*, *Smart Glance 30 Detik*, dan *Selalu Menyala (AOD Klasik)*.
+  - Interaksi cerdas: Ketukan 1x me-reset waktu tayang glance, ketukan 2x atau usap langsung keluar ke layar kunci.
+  - Sensor proximity blackout: Layar padam 100% saat ponsel diletakkan tertelungkup atau di dalam saku.
+  - Anti burn-in pixel shift: Pergeseran koordinat tampilan secara berkala untuk menjaga keawetan panel AMOLED.
+  - Penyesuaian widget otomatis: Widget floating melayang disembunyikan total saat AOD aktif dan muncul kembali saat layar dibuka.
+
 ### [v0.3.0] - 2026-09-17
 - **Fitur Baru Game Booster (Anti-Lag)**:
   - Pembersihan memori latar belakang non-esensial secara instan menggunakan Android `ActivityManager.killBackgroundProcesses` native.

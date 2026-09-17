@@ -19,7 +19,8 @@ data class MonitorConfig(
     val cornerRadiusDp: Int = CORNER_RADIUS_PILL,
     val showQuickBoost: Boolean = false,
     val showOnLockscreen: Boolean = true,
-    val enableChargingAod: Boolean = false
+    val enableChargingAod: Boolean = false,
+    val aodGlanceDurationSec: Int = AOD_DURATION_10_SEC
 ) {
     companion object {
         private const val PREFS_NAME = "net_monitor_custom_prefs"
@@ -39,6 +40,12 @@ data class MonitorConfig(
         private const val KEY_SHOW_QUICK_BOOST = "key_show_quick_boost"
         private const val KEY_SHOW_ON_LOCKSCREEN = "key_show_on_lockscreen"
         private const val KEY_ENABLE_CHARGING_AOD = "key_enable_charging_aod"
+        private const val KEY_AOD_GLANCE_DURATION = "key_aod_glance_duration"
+
+        // Mode Durasi AOD Glance untuk Fast Charging 65W
+        const val AOD_DURATION_10_SEC = 10   // Smart Glance 10 Detik (Rekomendasi Cas Cepat 65W)
+        const val AOD_DURATION_30_SEC = 30   // Smart Glance 30 Detik
+        const val AOD_DURATION_ALWAYS = 0    // Selalu Menyala (Always-On)
 
         // Gaya Latar Belakang (Transparansi)
         const val BG_STYLE_SEMI_TRANSPARENT = 0  // Semi Transparan Gelap (Default #CC1E1E1E)
@@ -80,7 +87,8 @@ data class MonitorConfig(
                 cornerRadiusDp = prefs.getInt(KEY_CORNER_RADIUS, CORNER_RADIUS_PILL),
                 showQuickBoost = prefs.getBoolean(KEY_SHOW_QUICK_BOOST, false),
                 showOnLockscreen = prefs.getBoolean(KEY_SHOW_ON_LOCKSCREEN, true),
-                enableChargingAod = prefs.getBoolean(KEY_ENABLE_CHARGING_AOD, false)
+                enableChargingAod = prefs.getBoolean(KEY_ENABLE_CHARGING_AOD, false),
+                aodGlanceDurationSec = prefs.getInt(KEY_AOD_GLANCE_DURATION, AOD_DURATION_10_SEC)
             )
         }
 
@@ -104,6 +112,7 @@ data class MonitorConfig(
                 .putBoolean(KEY_SHOW_QUICK_BOOST, config.showQuickBoost)
                 .putBoolean(KEY_SHOW_ON_LOCKSCREEN, config.showOnLockscreen)
                 .putBoolean(KEY_ENABLE_CHARGING_AOD, config.enableChargingAod)
+                .putInt(KEY_AOD_GLANCE_DURATION, config.aodGlanceDurationSec)
                 .apply()
         }
     }
