@@ -13,10 +13,12 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.example.netmonitor.engine.DeviceStatsProvider
 import com.example.netmonitor.engine.FpsProvider
+import com.example.netmonitor.engine.GameBooster
 import com.example.netmonitor.engine.PingExecutor
 import com.example.netmonitor.engine.TrafficCalculator
 import com.example.netmonitor.model.MonitorConfig
@@ -39,11 +41,13 @@ import kotlinx.coroutines.withContext
  * 2. Modular & On-Demand: Komputasi metrik yang tidak diaktifkan pengguna diabaikan demi efisiensi CPU.
  * 3. Kepatuhan Android 14+ (API 34+): Foreground Service type 'specialUse'.
  * 4. Zero Memory Leak: Pembersihan tuntas saat onDestroy().
+ * 5. Integrasi Game Boost Instan via Floating HUD dan Quick Action Notifikasi.
  */
 class NetworkMonitorService : Service() {
 
     companion object {
         const val ACTION_STOP_SERVICE: String = "com.example.netmonitor.action.STOP_SERVICE"
+        const val ACTION_GAME_BOOST: String = "com.example.netmonitor.action.GAME_BOOST"
         private const val NOTIFICATION_CHANNEL_ID: String = "net_monitor_channel"
         private const val NOTIFICATION_CHANNEL_NAME: String = "Network Monitor"
         private const val NOTIFICATION_ID: Int = 1001
@@ -61,6 +65,10 @@ class NetworkMonitorService : Service() {
 
         fun updateConfiguration(config: MonitorConfig) {
             activeInstance?.onConfigChanged(config)
+        }
+
+        fun triggerBoostFromAnywhere() {
+            activeInstance?.triggerGameBoost()
         }
     }
 
@@ -109,6 +117,11 @@ class NetworkMonitorService : Service() {
         fpsProvider = FpsProvider(this)
         floatingWindowManager = FloatingWindowManager(this)
 
+        // Hubungkan tombol Quick Boost di Floating HUD ke GameBooster
+        floatingWindowManager.onQuickBoostListener = {
+            triggerGameBoost()
+        }
+
         startForegroundServiceInternal()
 
         val isOverlayShown = floatingWindowManager.show()
@@ -128,9 +141,16 @@ class NetworkMonitorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP_SERVICE) {
-            stopSelf()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_STOP_SERVICE -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+
+            ACTION_GAME_BOOST -> {
+                triggerGameBoost()
+                return START_NOT_STICKY
+            }
         }
         return START_STICKY
     }
@@ -141,6 +161,26 @@ class NetworkMonitorService : Service() {
     fun onConfigChanged(newConfig: MonitorConfig) {
         currentConfig = newConfig
         floatingWindowManager.applyConfig(newConfig)
+    }
+
+    /**
+     * Menjalankan proses Game Boost ringan dan menampilkan feedback ke floating HUD & Toast.
+     */
+    fun triggerGameBoost() {
+        serviceScope.launch {
+            withContext(Dispatchers.Main) {
+                floatingWindowManager.showBoostFeedback("⚡ BOOST...")
+                Toast.makeText(this@NetworkMonitorService, "🚀 Memulai Game Boost...", Toast.LENGTH_SHORT).show()
+            }
+
+            val result = GameBooster.boost(this@NetworkMonitorService)
+
+            withContext(Dispatchers.Main) {
+                floatingWindowManager.showBoostFeedback("+${result.freedRamMb}MB")
+                val msg = "🚀 Game Boost Selesai!\n+${result.formattedFreedRam} RAM Bebas • Ping: ${result.latencyMs}ms"
+                Toast.makeText(this@NetworkMonitorService, msg, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun startForegroundServiceInternal() {
@@ -156,6 +196,16 @@ class NetworkMonitorService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val boostIntent = Intent(this, NetworkMonitorService::class.java).apply {
+            action = ACTION_GAME_BOOST
+        }
+        val boostPendingIntent = PendingIntent.getService(
+            this,
+            1,
+            boostIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification: Notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("System & Network Monitor Aktif")
             .setContentText("Memantau kecepatan data, latensi, FPS/Hz, RAM, dan suhu perangkat.")
@@ -163,6 +213,7 @@ class NetworkMonitorService : Service() {
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .addAction(android.R.drawable.ic_media_play, "⚡ Game Boost", boostPendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Hentikan", stopPendingIntent)
             .build()
 

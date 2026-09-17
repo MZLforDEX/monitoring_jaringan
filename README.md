@@ -1,11 +1,11 @@
-# Network Monitor (Floating HUD)
+# Network Monitor (Floating HUD & Game Booster)
 
-Aplikasi Android untuk memantau lalu lintas jaringan dan performa perangkat secara real-time lewat widget melayang (*floating overlay*).
+Aplikasi Android untuk memantau lalu lintas jaringan, performa perangkat secara real-time lewat widget melayang (*floating overlay*), kustomisasi tampilan HUD bebas, dan fitur **Game Booster (Anti-Lag)** ultra-ringan tanpa membebani baterai/perangkat.
 
-[![Download APK](https://img.shields.io/badge/Download%20APK-v0.2.0-2ea44f?style=for-the-badge&logo=android&logoColor=white)](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.2.0-debug.apk)
+[![Download APK](https://img.shields.io/badge/Download%20APK-v0.3.0-2ea44f?style=for-the-badge&logo=android&logoColor=white)](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.3.0-debug.apk)
 [![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin-purple.svg)](https://kotlinlang.org)
-[![Version](https://img.shields.io/badge/Release-v0.2.0-blue.svg)](https://github.com/MZLforDEX/monitoring_jaringan)
+[![Version](https://img.shields.io/badge/Release-v0.3.0-blue.svg)](https://github.com/MZLforDEX/monitoring_jaringan)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
 ---
@@ -16,13 +16,13 @@ File installer APK siap pakai dapat diunduh langsung tanpa harus compile:
 
 | Versi | Tautan Unduh | Ukuran | Status |
 | :--- | :--- | :--- | :--- |
-| **v0.2.0** *(Terbaru)* | [**⬇️ Unduh NetworkMonitor-v0.2.0-debug.apk**](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.2.0-debug.apk) | ~2.3 MB | ✅ Stabil |
+| **v0.3.0** *(Terbaru)* | [**⬇️ Unduh NetworkMonitor-v0.3.0-debug.apk**](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.3.0-debug.apk) | ~2.3 MB | 🚀 Stabil |
 
 > 💡 **Catatan**: Jika Android menampilkan konfirmasi keamanan *"Aplikasi dari sumber tidak dikenal"*, pilih **Tetap Pasang (Install Anyway)**.
 
 ---
 
-## Fitur
+## Fitur Utama
 
 - **Kecepatan Jaringan**: Kecepatan download (↓) dan upload (↑) aktual per detik.
 - **Latensi / Ping**: Pengukuran RTT via TCP socket (`1.1.1.1:53`).
@@ -31,8 +31,21 @@ File installer APK siap pakai dapat diunduh langsung tanpa harus compile:
   - *Game Mode*: In-game FPS aktual via Shizuku / SurfaceFlinger.
 - **Penggunaan RAM**: Persentase memori RAM perangkat yang terpakai.
 - **Suhu Baterai**: Suhu perangkat saat ini dalam derajat Celsius (°C).
-- **Kustomisasi Tampilan**: Memilih metrik mana saja yang ingin dimunculkan pada widget melayang.
-- **Floating Widget**: Posisi bebas digeser, tidak menghalangi keyboard, dan otomatis jeda saat layar mati untuk menghemat daya.
+- **🚀 Game Booster (Anti-Lag)**:
+  - Mengoptimalkan RAM dengan membersihkan proses latar belakang aplikasi pihak ketiga non-esensial secara instan.
+  - Dukungan akselerasi shell tingkat kernel via Shizuku (`am kill-all` & cache trim).
+  - Pre-warm rute jaringan & DNS untuk mencegah spike latensi game.
+  - **Ultra-Ringan & 0 Beban Latar Belakang**: Tidak ada daemon atau background loop yang membebani CPU/baterai, hanya berjalan on-demand saat dipicu pengguna.
+  - Dapat dipicu langsung dari layar utama, tombol cepat `⚡ BOOST` di floating HUD saat sedang main game, atau melalui tombol aksi di notifikasi status!
+- **🎨 Kustomisasi Widget Melayang**:
+  - **Latar Belakang (Transparansi)**: Pilihan Semi-Transparan Gelap (~80%), Transparan Penuh (Bening / 100% Transparan tanpa background), Solid Hitam Pekat (100% gelap kontras), atau Kaca Cyber Neon (*Glassmorphism*).
+  - **Skema Warna Teks**: Berwarna-warni aksen neon per metrik, Polos Putih Bersih (monokrom minimalis), Polos Hijau Matrix (terminal hacker), atau Polos Cyan Cyber (gamer esport).
+  - **Ukuran Font Teks**: Kecil (9.5 sp), Standar (11 sp), atau Besar (13 sp).
+  - **Bentuk Sudut**: Kapsul Bulat Penuh (*Pill 24dp*) atau Kotak Membulat Modern (*Rounded 8dp*).
+  - **Tombol Quick Boost HUD**: Toggle untuk memunculkan tombol boost langsung di widget overlay.
+  - **Live Preview Real-Time**: Mockup widget langsung di layar aplikasi yang berubah seketika saat pengaturan diganti.
+  - **Pilihan Metrik Bebas**: Memilih metrik mana saja yang ingin dimunculkan/disembunyikan.
+- **Floating Widget Fleksibel**: Bebas digeser (drag), deteksi tap tombol yang akurat, tidak menghalangi keyboard, dan otomatis jeda komputasi saat layar mati untuk menghemat daya.
 
 ---
 
@@ -70,22 +83,23 @@ cd monitoring_jaringan
 # Build APK debug
 ./gradlew assembleDebug
 ```
-Output APK berada di `app/build/outputs/apk/debug/app-debug.apk`.
+Output APK berada di `app/build/outputs/apk/debug/app-debug.apk` atau file root `NetworkMonitor-v0.3.0-debug.apk`.
 
 ### Pasang ke Perangkat
 ```bash
-adb install -r NetworkMonitor-v0.2.0-debug.apk
+adb install -r NetworkMonitor-v0.3.0-debug.apk
 ```
 
 ---
 
 ## Tentang Aplikasi
 
-**Network Monitor (Floating HUD)** adalah utilitas Android open-source yang dirancang untuk memantau performa perangkat dan konektivitas jaringan secara real-time lewat floating pill widget yang fleksibel.
+**Network Monitor (Floating HUD & Game Booster)** adalah utilitas Android open-source yang dirancang untuk memantau performa perangkat, konektivitas jaringan secara real-time, dan mengoptimalkan performa game lewat floating HUD yang fleksibel.
 
 ### Keunggulan Utama
 - **Ringan & Efisien**: Dibuat murni dengan Kotlin, tanpa library analitik, tanpa tracking, dan 100% bebas iklan.
 - **Zero Idle Drain**: Sistem otomatis menjeda kalkulasi dan komputasi metrik secara penuh saat layar mati.
+- **Game Booster On-Demand**: Hanya bekerja saat dipicu, membebaskan memori RAM dan menstabilkan jaringan tanpa meninggalkan jejak proses latar belakang.
 - **True Game FPS**: Membaca frame hardware compositor nyata dari `SurfaceFlinger` melalui Shizuku API tanpa memerlukan root.
 
 ---
@@ -93,46 +107,37 @@ adb install -r NetworkMonitor-v0.2.0-debug.apk
 ## Catatan Rilis (Release Notes)
 
 Setiap pembaruan mengikuti aturan penomoran versi:
-- **Update Kecil (Minor / Patch)**: Kenaikan angka belakang (misal: `v0.1.9` ➔ `v0.2.0`).
-- **Update Besar (Major Feature)**: Kenaikan angka depan (misal: `v0.x.x` ➔ `v1.0.0`).
+- **Update Kecil (Minor / Patch)**: Kenaikan angka belakang (misal: `v0.2.0` ➔ `v0.2.1`).
+- **Update Besar (Major Feature)**: Kenaikan angka tengah/depan (misal: `v0.2.0` ➔ `v0.3.0`).
 
 Daftar rilis lengkap dan file APK dapat diakses di halaman [GitHub Releases](https://github.com/MZLforDEX/monitoring_jaringan/releases).
+
+### [v0.3.0] - 2026-09-17
+- **Fitur Baru Game Booster (Anti-Lag)**:
+  - Pembersihan memori latar belakang non-esensial secara instan menggunakan Android `ActivityManager.killBackgroundProcesses` native.
+  - Integrasi shell istimewa Shizuku (`am kill-all` dan pemangkasan cache 256MB) untuk melepaskan ratusan MB RAM saat bermain game.
+  - Pre-warm rute koneksi DNS socket guna mencegah lag/spike ping saat game baru dimulai.
+  - Indikator penggunaan RAM real-time (Total, Bebas, dan Persentase terpakai) dengan animasi progres modern.
+  - **Akses Cepat 3-in-1**: Dapat dijalankan dari tombol di aplikasi, tombol interaktif `⚡ BOOST` di floating HUD, atau tombol aksi di notifikasi sistem.
+  - **Ultra-Ringan**: 0% idle compute, 0 background daemon, tanpa menguras baterai.
+- **Menu Kustomisasi Tampilan Widget (Custom Widget)**:
+  - **Pilihan Latar Belakang (Transparansi)**: Mendukung *Semi-Transparan Gelap*, *Transparan Penuh (Bening / 100% Transparan)*, *Solid Hitam Pekat*, dan *Kaca Cyber Neon (Glassmorphism)*.
+  - **Skema Warna Teks**: Mendukung *Berwarna-warni Aksen Neon* (tiap metrik memiliki warna khas), *Polos Putih Bersih (Monokrom)*, *Polos Hijau Matrix*, dan *Polos Cyan Cyber*.
+  - **Ukuran Font Teks**: Pilihan ukuran teks *Kecil (9.5 sp)*, *Standar (11 sp)*, dan *Besar (13 sp)*.
+  - **Bentuk Sudut Widget**: Pilihan bentuk *Kapsul Bulat (Pill 24dp)* atau *Kotak Membulat Modern (8dp)*.
+  - **Tombol Quick Boost Floating HUD**: Opsi menampilkan/menyembunyikan tombol pintas `⚡ BOOST` langsung di layar game.
+  - **Live Preview Interaktif**: Pratinjau langsung tampilan widget di dalam aplikasi sebelum mengaktifkan overlay.
+- **Pembaruan Dependensi & Keamanan**:
+  - Penambahan izin `KILL_BACKGROUND_PROCESSES` untuk modul Game Booster.
+  - Pembaruan touch event listener di floating overlay dengan pemisahan gesture drag vs tap akurat tanpa delay.
 
 ### [v0.2.0] - 2026-09-16
 - **Perbaikan Bug Stuck 1 FPS saat Buka Aplikasi**: Menghapus kondisi pembacaan keliru di mana angka FPS terkunci di 1 FPS ketika membuka aplikasi tertentu atau saat jendela aplikasi baru dimulai.
 - **Filter Cerdas Idle vs Active Render**: Menghilangkan false positive delta 0 atau 1 frame dari `dumpsys gfxinfo` saat aplikasi belum mulai me-render frame animasi, serta mendeteksi pergantian fokus aplikasi secara instan.
-- **Fallback Refresh Rate Layar Dinamis**: Mencegah penurunan angka FPS palsu ke 1 FPS akibat pembatasan/throttling background VSYNC oleh sistem operasi (seperti MIUI/HyperOS battery saver). Jika tidak ada frame game aktif, widget menampilkan refresh rate fisik layar yang mulus (60/90/120 Hz).
-- **Proteksi Kebocoran File Descriptor & Memory**: Menutup `proc.errorStream` dan `proc.outputStream` secara konsisten pada setiap eksekusi shell, serta mereset cache sampler seketika saat aplikasi latar depan berganti.
-
-### [v0.1.9] - 2026-09-16
-- **Perbaikan Bug Stuck 0 FPS**: Menghapus kegagalan fallback yang menyebabkan angka FPS terkunci di 0 FPS. Kini menggunakan native Android `Choreographer` hardware VSYNC callback (0.00% CPU) sebagai baseline yang selalu aktif dan dinamis saat layar menyala.
-- **Super Ringan & Zero Performance Impact**: Pemanggilan metrik FPS kini sepenuhnya non-blocking (< 0.001 ms dari RAM cache). Proses background sampling dibatasi hard timeout 350ms, dan perintah lambat `dumpsys activity activities` (1-2 MB) diganti dengan `dumpsys activity top-resumed` (~10ms) sehingga HP tetap dingin dan tidak lag saat bermain game.
-- **Pembersihan Zombie Process & IPC Shizuku**: Menghilangkan overhead refleksi pada `Shizuku.newProcess()`, menutup stream input/output secara tuntas, dan memastikan pemusnahan proses di setiap siklus.
-- **Lifecycle Otomatis Penuh**: Listener VSYNC dan polling FPS otomatis dihentikan saat layar mati (`ACTION_SCREEN_OFF`) dan dilanjutkan seketika saat layar menyala (`ACTION_SCREEN_ON`).
-
-### [v0.1.8] - 2026-09-16
-- **True Game FPS Terpisah dari Refresh Rate Layar**: Memperbaiki masalah pada perangkat Xiaomi (MIUI/HyperOS) di mana angka FPS terkunci di 90 atau 120 FPS.
-- **Dukungan Frame Drop & Freeze Nyata**: Mengukur render buffer frame per detik dari game yang sedang aktif.
-
-### [v0.1.7] - 2026-09-16
-- **Perbaikan FPS Layar 90Hz/120Hz (Xiaomi/MIUI/HyperOS)**: Menghapus ketergantungan pada PageFlip counter display panel yang mengunci angka di 90/120Hz. Kini memantau langsung active render layer game (`SurfaceView`) dan telemetry `TimeStats`.
-- **Fokus Layer Otomatis**: Mendeteksi jendela game/aplikasi latar depan secara cerdas dan memprioritaskan layer render terkait.
-
-### [v0.1.6] - 2026-09-16
-- **Tombol Unduh Langsung**: Menambahkan tombol badge download APK instan di bagian atas README repositori.
-- **Engine FPS Real-time**: Mengimplementasikan pembacaan delta hardware compositor SurfaceFlinger PageFlip dan layer latency berbasis monotonic clock.
-- **Integrasi Shizuku**: Menambahkan izin `INTERACT_ACROSS_USERS_FULL` pada provider Shizuku agar handshake IPC binder berjalan mulus.
-- **UI & About**: Menambahkan kartu "Tentang Aplikasi" di aplikasi dengan tautan cepat ke repositori GitHub.
-
-### [v0.1.5]
-- **Shizuku API**: Integrasi resmi Shizuku API v13.1.5 untuk membaca FPS game tanpa root fisik.
-- **Ikon Baru**: Desain ikon adaptive bertema speedometer HUD modern.
-- **Android 14+ Support**: Kompatibilitas foreground service `specialUse`.
-
-### [v0.1.0 - v0.1.4]
-- Rilis awal floating HUD overlay dengan pemantauan kecepatan unduh/unggah, ping socket, RAM, dan suhu perangkat.
+- **Fallback Refresh Rate Layar Dinamis**: Mencegah penurunan angka FPS palsu ke 1 FPS akibat pembatasan/throttling background VSYNC oleh sistem operasi.
+- **Proteksi Kebocoran File Descriptor & Memory**: Menutup stream input/output secara konsisten dan mereset cache sampler seketika saat aplikasi latar depan berganti.
 
 ---
 
 ## Lisensi
-Proyek ini bersifat open-source dan bebas digunakan untuk keperluan edukasi maupun pengembangan pribadi.
+Proyek ini bersifat open-source dan bebas digunakan untuk keperluan edukasi maupun pengembangan pribadi di bawah lisensi MIT.

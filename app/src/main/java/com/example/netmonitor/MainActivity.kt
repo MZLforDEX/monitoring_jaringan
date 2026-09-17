@@ -10,9 +10,13 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.TypedValue
 import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.ProgressBar
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -20,19 +24,29 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.example.netmonitor.engine.FpsProvider
+import com.example.netmonitor.engine.GameBooster
 import com.example.netmonitor.engine.ShizukuManager
 import com.example.netmonitor.model.MonitorConfig
-import rikka.shizuku.Shizuku
+import com.example.netmonitor.ui.WidgetStyleHelper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Aktivitas utama untuk konfigurasi performa HUD, verifikasi izin,
- * pengaturan kustomisasi metrik yang ditampilkan, dan kontrol Service.
+ * pengaturan kustomisasi widget (transparansi, skema warna, font, bentuk),
+ * Game Booster anti-lag, dan kontrol Service.
  */
 class MainActivity : ComponentActivity() {
 
     companion object {
         private const val SHIZUKU_REQ_CODE = 2001
     }
+
+    private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private lateinit var viewStatusDot: View
     private lateinit var tvStatusTitle: TextView
@@ -43,7 +57,55 @@ class MainActivity : ComponentActivity() {
     private lateinit var btnGrantNotification: Button
     private lateinit var btnToggleService: Button
 
-    // CheckBoxes Kustomisasi Metrik
+    // Game Booster Views
+    private lateinit var tvRamStats: TextView
+    private lateinit var pbRamUsage: ProgressBar
+    private lateinit var btnGameBoost: Button
+    private lateinit var layoutBoostResult: View
+    private lateinit var tvBoostResultTitle: TextView
+    private lateinit var tvBoostResultDetails: TextView
+
+    // Live Preview Views
+    private lateinit var previewRootWidget: View
+    private lateinit var previewTvDownload: TextView
+    private lateinit var previewSepDownload: View
+    private lateinit var previewTvUpload: TextView
+    private lateinit var previewSepUpload: View
+    private lateinit var previewTvPing: TextView
+    private lateinit var previewSepPing: View
+    private lateinit var previewTvFps: TextView
+    private lateinit var previewSepFps: View
+    private lateinit var previewTvRam: TextView
+    private lateinit var previewSepRam: View
+    private lateinit var previewTvTemp: TextView
+    private lateinit var previewSepBoost: View
+    private lateinit var previewBtnBoost: TextView
+
+    // Kustomisasi Tampilan Widget (RadioGroups & CheckBoxes)
+    private lateinit var rgBgStyle: RadioGroup
+    private lateinit var rbBgSemiTransparent: RadioButton
+    private lateinit var rbBgTransparent: RadioButton
+    private lateinit var rbBgSolidBlack: RadioButton
+    private lateinit var rbBgGlassNeon: RadioButton
+
+    private lateinit var rgTextStyle: RadioGroup
+    private lateinit var rbTextColored: RadioButton
+    private lateinit var rbTextPlainWhite: RadioButton
+    private lateinit var rbTextMatrixGreen: RadioButton
+    private lateinit var rbTextCyanCyber: RadioButton
+
+    private lateinit var rgTextSize: RadioGroup
+    private lateinit var rbSizeSmall: RadioButton
+    private lateinit var rbSizeNormal: RadioButton
+    private lateinit var rbSizeLarge: RadioButton
+
+    private lateinit var rgCornerRadius: RadioGroup
+    private lateinit var rbCornerPill: RadioButton
+    private lateinit var rbCornerRounded: RadioButton
+
+    private lateinit var cbQuickBoost: CheckBox
+
+    // CheckBoxes Metrik
     private lateinit var cbDownload: CheckBox
     private lateinit var cbUpload: CheckBox
     private lateinit var cbPing: CheckBox
@@ -57,6 +119,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var btnRequestShizuku: Button
     private lateinit var tvAdbCommand: TextView
     private lateinit var fpsProvider: FpsProvider
+
+    private var isInitializingUi: Boolean = true
 
     // 1. Launcher modern untuk izin overlay (SYSTEM_ALERT_WINDOW)
     private val overlayPermissionLauncher: ActivityResultLauncher<Intent> =
@@ -119,10 +183,12 @@ class MainActivity : ComponentActivity() {
         initViews()
         loadCustomConfig()
         setupListeners()
+        isInitializingUi = false
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        mainScope.cancel()
         try {
             rikka.shizuku.Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
             rikka.shizuku.Shizuku.removeBinderReceivedListener(shizukuBinderReceivedListener)
@@ -134,6 +200,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         updateUiState()
+        updateRamDisplay()
     }
 
     private fun initViews() {
@@ -146,6 +213,55 @@ class MainActivity : ComponentActivity() {
         btnGrantNotification = findViewById(R.id.btnGrantNotification)
         btnToggleService = findViewById(R.id.btnToggleService)
 
+        // Game Booster
+        tvRamStats = findViewById(R.id.tvRamStats)
+        pbRamUsage = findViewById(R.id.pbRamUsage)
+        btnGameBoost = findViewById(R.id.btnGameBoost)
+        layoutBoostResult = findViewById(R.id.layoutBoostResult)
+        tvBoostResultTitle = findViewById(R.id.tvBoostResultTitle)
+        tvBoostResultDetails = findViewById(R.id.tvBoostResultDetails)
+
+        // Live Preview Views
+        previewRootWidget = findViewById(R.id.previewRootWidget)
+        previewTvDownload = findViewById(R.id.previewTvDownload)
+        previewSepDownload = findViewById(R.id.previewSepDownload)
+        previewTvUpload = findViewById(R.id.previewTvUpload)
+        previewSepUpload = findViewById(R.id.previewSepUpload)
+        previewTvPing = findViewById(R.id.previewTvPing)
+        previewSepPing = findViewById(R.id.previewSepPing)
+        previewTvFps = findViewById(R.id.previewTvFps)
+        previewSepFps = findViewById(R.id.previewSepFps)
+        previewTvRam = findViewById(R.id.previewTvRam)
+        previewSepRam = findViewById(R.id.previewSepRam)
+        previewTvTemp = findViewById(R.id.previewTvTemp)
+        previewSepBoost = findViewById(R.id.previewSepBoost)
+        previewBtnBoost = findViewById(R.id.previewBtnBoost)
+
+        // RadioGroups
+        rgBgStyle = findViewById(R.id.rgBgStyle)
+        rbBgSemiTransparent = findViewById(R.id.rbBgSemiTransparent)
+        rbBgTransparent = findViewById(R.id.rbBgTransparent)
+        rbBgSolidBlack = findViewById(R.id.rbBgSolidBlack)
+        rbBgGlassNeon = findViewById(R.id.rbBgGlassNeon)
+
+        rgTextStyle = findViewById(R.id.rgTextStyle)
+        rbTextColored = findViewById(R.id.rbTextColored)
+        rbTextPlainWhite = findViewById(R.id.rbTextPlainWhite)
+        rbTextMatrixGreen = findViewById(R.id.rbTextMatrixGreen)
+        rbTextCyanCyber = findViewById(R.id.rbTextCyanCyber)
+
+        rgTextSize = findViewById(R.id.rgTextSize)
+        rbSizeSmall = findViewById(R.id.rbSizeSmall)
+        rbSizeNormal = findViewById(R.id.rbSizeNormal)
+        rbSizeLarge = findViewById(R.id.rbSizeLarge)
+
+        rgCornerRadius = findViewById(R.id.rgCornerRadius)
+        rbCornerPill = findViewById(R.id.rbCornerPill)
+        rbCornerRounded = findViewById(R.id.rbCornerRounded)
+
+        cbQuickBoost = findViewById(R.id.cbQuickBoost)
+
+        // CheckBoxes Metrik
         cbDownload = findViewById(R.id.cbDownload)
         cbUpload = findViewById(R.id.cbUpload)
         cbPing = findViewById(R.id.cbPing)
@@ -153,6 +269,7 @@ class MainActivity : ComponentActivity() {
         cbRam = findViewById(R.id.cbRam)
         cbTemp = findViewById(R.id.cbTemp)
 
+        // FPS & Shizuku
         tvFpsStatus = findViewById(R.id.tvFpsStatus)
         tvShizukuStatus = findViewById(R.id.tvShizukuStatus)
         btnRequestShizuku = findViewById(R.id.btnRequestShizuku)
@@ -161,16 +278,53 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Memuat status checkbox dari konfigurasi tersimpan.
+     * Memuat konfigurasi tersimpan dan mengatur status elemen input UI.
      */
     private fun loadCustomConfig() {
         val config = MonitorConfig.load(this)
+
+        // Background Style
+        when (config.bgStyle) {
+            MonitorConfig.BG_STYLE_TRANSPARENT -> rbBgTransparent.isChecked = true
+            MonitorConfig.BG_STYLE_SOLID_BLACK -> rbBgSolidBlack.isChecked = true
+            MonitorConfig.BG_STYLE_GLASS_NEON -> rbBgGlassNeon.isChecked = true
+            else -> rbBgSemiTransparent.isChecked = true
+        }
+
+        // Text Color Style
+        when (config.textStyle) {
+            MonitorConfig.TEXT_STYLE_PLAIN_WHITE -> rbTextPlainWhite.isChecked = true
+            MonitorConfig.TEXT_STYLE_MATRIX_GREEN -> rbTextMatrixGreen.isChecked = true
+            MonitorConfig.TEXT_STYLE_CYAN_CYBER -> rbTextCyanCyber.isChecked = true
+            else -> rbTextColored.isChecked = true
+        }
+
+        // Text Size
+        when {
+            config.textSizeSp <= MonitorConfig.TEXT_SIZE_SMALL -> rbSizeSmall.isChecked = true
+            config.textSizeSp >= MonitorConfig.TEXT_SIZE_LARGE -> rbSizeLarge.isChecked = true
+            else -> rbSizeNormal.isChecked = true
+        }
+
+        // Corner Radius
+        when (config.cornerRadiusDp) {
+            MonitorConfig.CORNER_RADIUS_ROUNDED -> rbCornerRounded.isChecked = true
+            else -> rbCornerPill.isChecked = true
+        }
+
+        // Quick Boost in Widget
+        cbQuickBoost.isChecked = config.showQuickBoost
+
+        // Metrik CheckBoxes
         cbDownload.isChecked = config.showDownload
         cbUpload.isChecked = config.showUpload
         cbPing.isChecked = config.showPing
         cbFps.isChecked = config.showFps
         cbRam.isChecked = config.showRam
         cbTemp.isChecked = config.showTemp
+
+        // Sinkronisasi live preview awal
+        updateLivePreview(config)
     }
 
     private fun setupListeners() {
@@ -184,6 +338,11 @@ class MainActivity : ComponentActivity() {
 
         btnToggleService.setOnClickListener {
             handleToggleService()
+        }
+
+        // Listener Aksi Game Booster
+        btnGameBoost.setOnClickListener {
+            handleGameBoost()
         }
 
         btnRequestShizuku.setOnClickListener {
@@ -224,36 +383,180 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Listener untuk pembaruan kustomisasi metrik secara instan
-        val configChangeListener = {
-            saveAndApplyConfig()
+        // Listener Terpadu untuk Perubahan Kustomisasi Widget
+        val onSettingChanged = {
+            if (!isInitializingUi) {
+                saveAndApplyConfig()
+            }
         }
 
-        cbDownload.setOnCheckedChangeListener { _, _ -> configChangeListener() }
-        cbUpload.setOnCheckedChangeListener { _, _ -> configChangeListener() }
-        cbPing.setOnCheckedChangeListener { _, _ -> configChangeListener() }
-        cbFps.setOnCheckedChangeListener { _, _ -> configChangeListener() }
-        cbRam.setOnCheckedChangeListener { _, _ -> configChangeListener() }
-        cbTemp.setOnCheckedChangeListener { _, _ -> configChangeListener() }
+        rgBgStyle.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        rgTextStyle.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        rgTextSize.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        rgCornerRadius.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        cbQuickBoost.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+
+        cbDownload.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        cbUpload.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        cbPing.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        cbFps.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        cbRam.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        cbTemp.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
     }
 
     /**
-     * Menyimpan pilihan checkbox pengguna dan meneruskannya langsung ke Service yang sedang aktif.
+     * Memperbarui visual Live Preview widget secara instan di dalam layar aplikasi.
+     */
+    private fun updateLivePreview(config: MonitorConfig) {
+        // 1. Background & Corner Radius
+        previewRootWidget.background = WidgetStyleHelper.createWidgetBackground(
+            this,
+            config.bgStyle,
+            config.cornerRadiusDp
+        )
+
+        // 2. Text Size
+        val sizeSp = config.textSizeSp
+        previewTvDownload.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+        previewTvUpload.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+        previewTvPing.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+        previewTvFps.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+        previewTvRam.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+        previewTvTemp.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+        previewBtnBoost.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+
+        // 3. Text Colors
+        val textStyle = config.textStyle
+        previewTvDownload.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.DOWNLOAD, textStyle))
+        previewTvUpload.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.UPLOAD, textStyle))
+        previewTvPing.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.PING, textStyle))
+        previewTvFps.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.FPS, textStyle))
+        previewTvRam.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.RAM, textStyle))
+        previewTvTemp.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.TEMP, textStyle))
+        previewBtnBoost.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.BOOST, textStyle))
+
+        // 4. Separator Colors
+        val sepColor = WidgetStyleHelper.getSeparatorColor(textStyle)
+        previewSepDownload.setBackgroundColor(sepColor)
+        previewSepUpload.setBackgroundColor(sepColor)
+        previewSepPing.setBackgroundColor(sepColor)
+        previewSepFps.setBackgroundColor(sepColor)
+        previewSepRam.setBackgroundColor(sepColor)
+        previewSepBoost.setBackgroundColor(sepColor)
+
+        // 5. Visibility
+        previewTvDownload.visibility = if (config.showDownload) View.VISIBLE else View.GONE
+        previewTvUpload.visibility = if (config.showUpload) View.VISIBLE else View.GONE
+        previewTvPing.visibility = if (config.showPing) View.VISIBLE else View.GONE
+        previewTvFps.visibility = if (config.showFps) View.VISIBLE else View.GONE
+        previewTvRam.visibility = if (config.showRam) View.VISIBLE else View.GONE
+        previewTvTemp.visibility = if (config.showTemp) View.VISIBLE else View.GONE
+        previewBtnBoost.visibility = if (config.showQuickBoost) View.VISIBLE else View.GONE
+
+        val hasAfterDown = config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp || config.showQuickBoost
+        previewSepDownload.visibility = if (config.showDownload && hasAfterDown) View.VISIBLE else View.GONE
+
+        val hasAfterUp = config.showPing || config.showFps || config.showRam || config.showTemp || config.showQuickBoost
+        previewSepUpload.visibility = if (config.showUpload && hasAfterUp) View.VISIBLE else View.GONE
+
+        val hasAfterPing = config.showFps || config.showRam || config.showTemp || config.showQuickBoost
+        previewSepPing.visibility = if (config.showPing && hasAfterPing) View.VISIBLE else View.GONE
+
+        val hasAfterFps = config.showRam || config.showTemp || config.showQuickBoost
+        previewSepFps.visibility = if (config.showFps && hasAfterFps) View.VISIBLE else View.GONE
+
+        val hasAfterRam = config.showTemp || config.showQuickBoost
+        previewSepRam.visibility = if (config.showRam && hasAfterRam) View.VISIBLE else View.GONE
+
+        val hasAnyBeforeBoost = config.showDownload || config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp
+        previewSepBoost.visibility = if (config.showQuickBoost && hasAnyBeforeBoost) View.VISIBLE else View.GONE
+    }
+
+    /**
+     * Membaca pilihan pengguna saat ini dan menyimpannya secara persisten.
      */
     private fun saveAndApplyConfig() {
+        val bgStyle = when {
+            rbBgTransparent.isChecked -> MonitorConfig.BG_STYLE_TRANSPARENT
+            rbBgSolidBlack.isChecked -> MonitorConfig.BG_STYLE_SOLID_BLACK
+            rbBgGlassNeon.isChecked -> MonitorConfig.BG_STYLE_GLASS_NEON
+            else -> MonitorConfig.BG_STYLE_SEMI_TRANSPARENT
+        }
+
+        val textStyle = when {
+            rbTextPlainWhite.isChecked -> MonitorConfig.TEXT_STYLE_PLAIN_WHITE
+            rbTextMatrixGreen.isChecked -> MonitorConfig.TEXT_STYLE_MATRIX_GREEN
+            rbTextCyanCyber.isChecked -> MonitorConfig.TEXT_STYLE_CYAN_CYBER
+            else -> MonitorConfig.TEXT_STYLE_COLORED
+        }
+
+        val textSizeSp = when {
+            rbSizeSmall.isChecked -> MonitorConfig.TEXT_SIZE_SMALL
+            rbSizeLarge.isChecked -> MonitorConfig.TEXT_SIZE_LARGE
+            else -> MonitorConfig.TEXT_SIZE_NORMAL
+        }
+
+        val cornerRadiusDp = when {
+            rbCornerRounded.isChecked -> MonitorConfig.CORNER_RADIUS_ROUNDED
+            else -> MonitorConfig.CORNER_RADIUS_PILL
+        }
+
         val newConfig = MonitorConfig(
             showDownload = cbDownload.isChecked,
             showUpload = cbUpload.isChecked,
             showPing = cbPing.isChecked,
             showFps = cbFps.isChecked,
             showRam = cbRam.isChecked,
-            showTemp = cbTemp.isChecked
+            showTemp = cbTemp.isChecked,
+            bgStyle = bgStyle,
+            textStyle = textStyle,
+            textSizeSp = textSizeSp,
+            cornerRadiusDp = cornerRadiusDp,
+            showQuickBoost = cbQuickBoost.isChecked
         )
-        MonitorConfig.save(this, newConfig)
 
-        // Perbarui widget secara langsung tanpa harus restart service
+        MonitorConfig.save(this, newConfig)
+        updateLivePreview(newConfig)
+
+        // Perbarui widget secara langsung jika service sedang aktif
         if (NetworkMonitorService.isServiceRunning) {
             NetworkMonitorService.updateConfiguration(newConfig)
+        }
+    }
+
+    /**
+     * Membaca dan memperbarui indikator penggunaan RAM perangkat secara real-time.
+     */
+    private fun updateRamDisplay() {
+        val stats = GameBooster.getRamStats(this)
+        tvRamStats.text = stats.formattedText
+        pbRamUsage.progress = stats.usedPercent
+    }
+
+    /**
+     * Menjalankan proses Game Boost anti-lag ringan dengan feedback visual ke pengguna.
+     */
+    private fun handleGameBoost() {
+        btnGameBoost.isEnabled = false
+        btnGameBoost.text = "⚡ Mengoptimalkan Memori & Game..."
+
+        mainScope.launch {
+            val result = GameBooster.boost(this@MainActivity)
+
+            updateRamDisplay()
+
+            layoutBoostResult.visibility = View.VISIBLE
+            tvBoostResultTitle.text = "✅ Berhasil Di-boost! +${result.formattedFreedRam} RAM Dibebaskan"
+            tvBoostResultDetails.text = "Penggunaan RAM: ${result.beforePercent}% ➔ ${result.afterPercent}% • ${result.killedAppsCount} proses latar belakang ditrim • Ping: ${result.latencyMs}ms (${result.durationMs}ms)"
+
+            btnGameBoost.isEnabled = true
+            btnGameBoost.text = "🚀 Boost Performa Game Sekarang"
+
+            Toast.makeText(
+                this@MainActivity,
+                "🚀 Game Boost Selesai! +${result.formattedFreedRam} RAM Bebas",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
