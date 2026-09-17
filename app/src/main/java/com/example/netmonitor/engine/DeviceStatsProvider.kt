@@ -28,7 +28,8 @@ class DeviceStatsProvider(context: Context) {
         val voltageVolts: Double,
         val currentMa: Int,
         val pluggedType: String,
-        val tempTenths: Int = 0
+        val tempTenths: Int = 0,
+        val batteryLevel: Int = 0
     )
 
     private val activityManager: ActivityManager =
@@ -75,6 +76,9 @@ class DeviceStatsProvider(context: Context) {
         val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
         val plugged = batteryStatus?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
         val tempTenths = batteryStatus?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
+        val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val batteryLevel = if (level >= 0 && scale > 0) (level * 100) / scale else 0
 
         val isCharging = plugged != 0 && (
             status == BatteryManager.BATTERY_STATUS_CHARGING ||
@@ -96,7 +100,8 @@ class DeviceStatsProvider(context: Context) {
                 voltageVolts = 0.0,
                 currentMa = 0,
                 pluggedType = pluggedType,
-                tempTenths = tempTenths
+                tempTenths = tempTenths,
+                batteryLevel = batteryLevel
             )
         }
 
@@ -159,7 +164,8 @@ class DeviceStatsProvider(context: Context) {
             voltageVolts = voltageVolts,
             currentMa = currentMa,
             pluggedType = pluggedType,
-            tempTenths = tempTenths
+            tempTenths = tempTenths,
+            batteryLevel = batteryLevel
         )
     }
 

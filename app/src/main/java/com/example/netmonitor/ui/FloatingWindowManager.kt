@@ -80,8 +80,14 @@ class FloatingWindowManager(private val context: Context) {
 
     private val layoutParams: WindowManager.LayoutParams = WindowManager.LayoutParams().apply {
         type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+        @Suppress("DEPRECATION")
+        var initialFlags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+        @Suppress("DEPRECATION")
+        if (currentConfig.showOnLockscreen) {
+            initialFlags = initialFlags or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+        }
+        flags = initialFlags
         format = PixelFormat.TRANSLUCENT
         width = WindowManager.LayoutParams.WRAP_CONTENT
         height = WindowManager.LayoutParams.WRAP_CONTENT
@@ -226,7 +232,15 @@ class FloatingWindowManager(private val context: Context) {
         val hasAnyBeforeBoost = config.showDownload || config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp || (config.showWatt && tvWatt?.visibility == View.VISIBLE)
         sepBoost?.visibility = if (config.showQuickBoost && hasAnyBeforeBoost) View.VISIBLE else View.GONE
 
-        // Jika view sudah terpasang, minta WindowManager menyesuaikan ukuran layout
+        // 6. Pengaturan Tampilan di Layar Kunci (Lockscreen)
+        @Suppress("DEPRECATION")
+        if (config.showOnLockscreen) {
+            layoutParams.flags = layoutParams.flags or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+        } else {
+            layoutParams.flags = layoutParams.flags and WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED.inv()
+        }
+
+        // Jika view sudah terpasang, minta WindowManager menyesuaikan ukuran layout dan flags
         if (isViewAttached && floatingView?.isAttachedToWindow == true) {
             try {
                 windowManager.updateViewLayout(floatingView, layoutParams)

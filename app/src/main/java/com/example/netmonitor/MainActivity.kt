@@ -118,7 +118,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var cbQuickBoost: CheckBox
 
-    // CheckBoxes Metrik
+    // CheckBoxes Metrik & Layar Kunci / AOD
     private lateinit var cbDownload: CheckBox
     private lateinit var cbUpload: CheckBox
     private lateinit var cbPing: CheckBox
@@ -126,6 +126,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var cbRam: CheckBox
     private lateinit var cbTemp: CheckBox
     private lateinit var cbWatt: CheckBox
+    private lateinit var cbShowLockscreen: CheckBox
+    private lateinit var cbChargingAod: CheckBox
+    private lateinit var btnTestAod: Button
 
     // Status FPS & ADB Command View & Shizuku
     private lateinit var tvFpsStatus: TextView
@@ -309,6 +312,9 @@ class MainActivity : ComponentActivity() {
         cbRam = findViewById(R.id.cbRam)
         cbTemp = findViewById(R.id.cbTemp)
         cbWatt = findViewById(R.id.cbWatt)
+        cbShowLockscreen = findViewById(R.id.cbShowLockscreen)
+        cbChargingAod = findViewById(R.id.cbChargingAod)
+        btnTestAod = findViewById(R.id.btnTestAod)
 
         // FPS & Shizuku
         tvFpsStatus = findViewById(R.id.tvFpsStatus)
@@ -364,6 +370,8 @@ class MainActivity : ComponentActivity() {
         cbRam.isChecked = config.showRam
         cbTemp.isChecked = config.showTemp
         cbWatt.isChecked = config.showWatt
+        cbShowLockscreen.isChecked = config.showOnLockscreen
+        cbChargingAod.isChecked = config.enableChargingAod
 
         // Sinkronisasi live preview awal
         updateLivePreview(config)
@@ -445,6 +453,13 @@ class MainActivity : ComponentActivity() {
         cbRam.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
         cbTemp.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
         cbWatt.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        cbShowLockscreen.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        cbChargingAod.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+
+        btnTestAod.setOnClickListener {
+            val aodIntent = Intent(this, com.example.netmonitor.ui.ChargingAodActivity::class.java)
+            startActivity(aodIntent)
+        }
     }
 
     /**
@@ -562,7 +577,9 @@ class MainActivity : ComponentActivity() {
             textStyle = textStyle,
             textSizeSp = textSizeSp,
             cornerRadiusDp = cornerRadiusDp,
-            showQuickBoost = cbQuickBoost.isChecked
+            showQuickBoost = cbQuickBoost.isChecked,
+            showOnLockscreen = cbShowLockscreen.isChecked,
+            enableChargingAod = cbChargingAod.isChecked
         )
 
         MonitorConfig.save(this, newConfig)

@@ -17,7 +17,9 @@ data class MonitorConfig(
     val textStyle: Int = TEXT_STYLE_COLORED,
     val textSizeSp: Float = TEXT_SIZE_NORMAL,
     val cornerRadiusDp: Int = CORNER_RADIUS_PILL,
-    val showQuickBoost: Boolean = false
+    val showQuickBoost: Boolean = false,
+    val showOnLockscreen: Boolean = true,
+    val enableChargingAod: Boolean = false
 ) {
     companion object {
         private const val PREFS_NAME = "net_monitor_custom_prefs"
@@ -29,12 +31,14 @@ data class MonitorConfig(
         private const val KEY_SHOW_TEMP = "key_show_temp"
         private const val KEY_SHOW_WATT = "key_show_watt"
 
-        // Kustomisasi Tampilan Widget
+        // Kustomisasi Tampilan Widget & AOD
         private const val KEY_BG_STYLE = "key_bg_style"
         private const val KEY_TEXT_STYLE = "key_text_style"
         private const val KEY_TEXT_SIZE = "key_text_size"
         private const val KEY_CORNER_RADIUS = "key_corner_radius"
         private const val KEY_SHOW_QUICK_BOOST = "key_show_quick_boost"
+        private const val KEY_SHOW_ON_LOCKSCREEN = "key_show_on_lockscreen"
+        private const val KEY_ENABLE_CHARGING_AOD = "key_enable_charging_aod"
 
         // Gaya Latar Belakang (Transparansi)
         const val BG_STYLE_SEMI_TRANSPARENT = 0  // Semi Transparan Gelap (Default #CC1E1E1E)
@@ -74,7 +78,9 @@ data class MonitorConfig(
                 textStyle = prefs.getInt(KEY_TEXT_STYLE, TEXT_STYLE_COLORED),
                 textSizeSp = prefs.getFloat(KEY_TEXT_SIZE, TEXT_SIZE_NORMAL),
                 cornerRadiusDp = prefs.getInt(KEY_CORNER_RADIUS, CORNER_RADIUS_PILL),
-                showQuickBoost = prefs.getBoolean(KEY_SHOW_QUICK_BOOST, false)
+                showQuickBoost = prefs.getBoolean(KEY_SHOW_QUICK_BOOST, false),
+                showOnLockscreen = prefs.getBoolean(KEY_SHOW_ON_LOCKSCREEN, true),
+                enableChargingAod = prefs.getBoolean(KEY_ENABLE_CHARGING_AOD, false)
             )
         }
 
@@ -96,6 +102,8 @@ data class MonitorConfig(
                 .putFloat(KEY_TEXT_SIZE, config.textSizeSp)
                 .putInt(KEY_CORNER_RADIUS, config.cornerRadiusDp)
                 .putBoolean(KEY_SHOW_QUICK_BOOST, config.showQuickBoost)
+                .putBoolean(KEY_SHOW_ON_LOCKSCREEN, config.showOnLockscreen)
+                .putBoolean(KEY_ENABLE_CHARGING_AOD, config.enableChargingAod)
                 .apply()
         }
     }

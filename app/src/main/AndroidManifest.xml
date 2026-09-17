@@ -60,6 +60,17 @@
             </intent-filter>
         </activity>
 
+        <!-- Layar Always-On Display (AOD) Khusus Saat Pengisian Daya -->
+        <activity
+            android:name=".ui.ChargingAodActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
+
         <!-- Foreground Service untuk pemantauan throughput jaringan dan floating overlay -->
         <service
             android:name=".NetworkMonitorService"

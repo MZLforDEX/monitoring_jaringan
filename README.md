@@ -43,6 +43,17 @@ File installer APK siap pakai dapat diunduh langsung tanpa harus compile:
   - Pre-warm rute jaringan & DNS untuk mencegah spike latensi game.
   - **Ultra-Ringan & 0 Beban Latar Belakang**: Tidak ada daemon atau background loop yang membebani CPU/baterai, hanya berjalan on-demand saat dipicu pengguna.
   - Dapat dipicu langsung dari layar utama, tombol cepat `⚡ BOOST` di floating HUD saat sedang main game, atau melalui tombol aksi di notifikasi status!
+- **🌙 Mode Layar AOD Saat Di-cas (Always-On Display OLED Pure Black)**:
+  - Layar AOD hemat daya yang aktif secara otomatis saat ponsel sedang di-cas dan layar terkunci/mati.
+  - **True AMOLED Pure Black (`#000000`)**: Mematikan 100% piksel OLED/AMOLED sehingga konsumsi daya layar hampir nol.
+  - **Kecerahan Layar Minimum (`0.01f`)**: Menjamin kenyamanan mata di ruangan gelap tanpa silau.
+  - **Proteksi Anti Burn-In**: Konten digeser halus secara berkala ($\pm 15$ px setiap 60 detik) untuk mencegah retensi bayangan piksel statis pada panel OLED/AMOLED.
+  - **Informasi Lengkap**: Menampilkan jam digital, tanggal, kecepatan pengisian daya besar (`⚡ 33.0 W`), persentase baterai (`85%`), jenis charger, voltase (`4.2V`), arus listrik (`3200mA`), dan suhu perangkat.
+  - **Ultra-Ringan (Polling 3 Detik)**: Hanya melakukan update pembacaan setiap 3.000 ms di background coroutine.
+  - **Gesture Cepat & Auto-Exit**: Keluar instan dengan ketukan ganda (double-tap), usapan jari (swipe), atau saat kabel charger dilepas (`ACTION_POWER_DISCONNECTED`).
+- **🔒 Tampilan Widget di Layar Kunci (Lockscreen Overlay)**:
+  - Widget melayang (*floating HUD*) dapat diatur agar tetap tampil saat layar terkunci via `FLAG_SHOW_WHEN_LOCKED`.
+  - Dapat diaktifkan atau dinonaktifkan kapan saja melalui menu kustomisasi widget.
 - **🎨 Kustomisasi Widget Melayang**:
   - **Latar Belakang (Transparansi)**: Pilihan Semi-Transparan Gelap (~80%), Transparan Penuh (Bening / 100% Transparan tanpa background), Solid Hitam Pekat (100% gelap kontras), atau Kaca Cyber Neon (*Glassmorphism*).
   - **Skema Warna Teks**: Berwarna-warni aksen neon per metrik, Polos Putih Bersih (monokrom minimalis), Polos Hijau Matrix (terminal hacker), atau Polos Cyan Cyber (gamer esport).
@@ -51,6 +62,7 @@ File installer APK siap pakai dapat diunduh langsung tanpa harus compile:
   - **Tombol Quick Boost HUD**: Toggle untuk memunculkan tombol boost langsung di widget overlay.
   - **Live Preview Real-Time**: Mockup widget langsung di layar aplikasi yang berubah seketika saat pengaturan diganti.
   - **Pilihan Metrik Bebas**: Memilih metrik mana saja yang ingin dimunculkan/disembunyikan (Download, Upload, Ping, FPS, RAM, Suhu, Watt Cas).
+  - **Tombol Uji Coba Layar AOD**: Menguji langsung tampilan layar AOD tanpa harus menunggu layar mati.
 - **Floating Widget Fleksibel**: Bebas digeser (drag), deteksi tap tombol yang akurat, tidak menghalangi keyboard, dan otomatis jeda komputasi saat layar mati untuk menghemat daya.
 
 ---

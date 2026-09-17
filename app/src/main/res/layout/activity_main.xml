@@ -903,6 +903,67 @@
                 android:textColor="#888888"
                 android:textSize="11sp" />
 
+            <!-- G. Layar Kunci & Always-On Display (AOD) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Layar Kunci &amp; Always-On Display (AOD)"
+                android:textColor="#E0E0E0"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- 1. Tampilkan di Layar Kunci -->
+            <CheckBox
+                android:id="@+id/cbShowLockscreen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Tampilkan Widget di Layar Kunci (Lockscreen)"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:checked="true" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="32dp"
+                android:text="Widget floating tetap dapat dilihat saat layar terkunci."
+                android:textColor="#888888"
+                android:textSize="11sp" />
+
+            <!-- 2. Mode Layar AOD Saat Di-cas -->
+            <CheckBox
+                android:id="@+id/cbChargingAod"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Mode Layar AOD Saat Di-cas (OLED Pure Black)"
+                android:textColor="#00E5FF"
+                android:textSize="12sp"
+                android:checked="false" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="32dp"
+                android:text="Menampilkan jam &amp; watt di layar hitam pekat saat dicas &amp; layar mati (hemat baterai &amp; anti burn-in)."
+                android:textColor="#888888"
+                android:textSize="11sp" />
+
+            <!-- Tombol Uji Coba Tampilan AOD -->
+            <Button
+                android:id="@+id/btnTestAod"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="4dp"
+                android:background="@drawable/bg_button_permission"
+                android:text="⚡ Uji Coba Tampilan Layar AOD"
+                android:textColor="#00E5FF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
         </LinearLayout>
 
         <!-- 4. Informasi Mode FPS & Refresh Rate -->

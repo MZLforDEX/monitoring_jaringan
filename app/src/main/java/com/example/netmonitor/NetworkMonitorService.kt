@@ -1,5 +1,6 @@
 package com.example.netmonitor
 
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -22,6 +23,7 @@ import com.example.netmonitor.engine.GameBooster
 import com.example.netmonitor.engine.PingExecutor
 import com.example.netmonitor.engine.TrafficCalculator
 import com.example.netmonitor.model.MonitorConfig
+import com.example.netmonitor.ui.ChargingAodActivity
 import com.example.netmonitor.ui.FloatingWindowManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -95,10 +97,25 @@ class NetworkMonitorService : Service() {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     pauseMonitoring()
+                    if (currentConfig.enableChargingAod) {
+                        checkAndLaunchChargingAod()
+                    }
                 }
 
                 Intent.ACTION_SCREEN_ON -> {
                     resumeMonitoring()
+                }
+
+                Intent.ACTION_POWER_CONNECTED -> {
+                    if (currentConfig.enableChargingAod) {
+                        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                        val isInteractive = powerManager?.isInteractive ?: true
+                        val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                        val isLocked = keyguardManager?.isKeyguardLocked ?: false
+                        if (!isInteractive || isLocked) {
+                            checkAndLaunchChargingAod()
+                        }
+                    }
                 }
             }
         }
@@ -253,6 +270,7 @@ class NetworkMonitorService : Service() {
             val filter = IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_ON)
                 addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_POWER_CONNECTED)
             }
             androidx.core.content.ContextCompat.registerReceiver(
                 this,
@@ -262,6 +280,21 @@ class NetworkMonitorService : Service() {
             )
             isReceiverRegistered = true
         }
+    }
+
+    /**
+     * Memeriksa status pengisian daya dan meluncurkan ChargingAodActivity jika perangkat sedang di-cas.
+     */
+    private fun checkAndLaunchChargingAod() {
+        try {
+            val chargingInfo = deviceStatsProvider.getChargingInfo(this)
+            if (chargingInfo.isCharging) {
+                val aodIntent = Intent(this, ChargingAodActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+                startActivity(aodIntent)
+            }
+        } catch (_: Exception) {}
     }
 
     private fun unregisterScreenReceiver() {
