@@ -2,10 +2,10 @@
 
 Aplikasi Android untuk memantau lalu lintas jaringan, performa perangkat secara real-time lewat widget melayang (*floating overlay*), kustomisasi tampilan HUD bebas, dan fitur **Game Booster (Anti-Lag)** ultra-ringan tanpa membebani baterai/perangkat.
 
-[![Download APK](https://img.shields.io/badge/Download%20APK-v0.3.0-2ea44f?style=for-the-badge&logo=android&logoColor=white)](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.3.0-debug.apk)
+[![Download APK](https://img.shields.io/badge/Download%20APK-v0.3.1-2ea44f?style=for-the-badge&logo=android&logoColor=white)](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.3.1-debug.apk)
 [![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin-purple.svg)](https://kotlinlang.org)
-[![Version](https://img.shields.io/badge/Release-v0.3.0-blue.svg)](https://github.com/MZLforDEX/monitoring_jaringan)
+[![Version](https://img.shields.io/badge/Release-v0.3.1-blue.svg)](https://github.com/MZLforDEX/monitoring_jaringan)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
 ---
@@ -16,7 +16,8 @@ File installer APK siap pakai dapat diunduh langsung tanpa harus compile:
 
 | Versi | Tautan Unduh | Ukuran | Status |
 | :--- | :--- | :--- | :--- |
-| **v0.3.0** *(Terbaru)* | [**⬇️ Unduh NetworkMonitor-v0.3.0-debug.apk**](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.3.0-debug.apk) | ~2.3 MB | 🚀 Stabil |
+| **v0.3.1** *(Terbaru)* | [**⬇️ Unduh NetworkMonitor-v0.3.1-debug.apk**](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.3.1-debug.apk) | ~2.3 MB | 🚀 Stabil |
+| **v0.3.0** | [**⬇️ Unduh NetworkMonitor-v0.3.0-debug.apk**](https://raw.githubusercontent.com/MZLforDEX/monitoring_jaringan/main/NetworkMonitor-v0.3.0-debug.apk) | ~2.3 MB | Stabil |
 
 > 💡 **Catatan**: Jika Android menampilkan konfirmasi keamanan *"Aplikasi dari sumber tidak dikenal"*, pilih **Tetap Pasang (Install Anyway)**.
 
@@ -24,6 +25,11 @@ File installer APK siap pakai dapat diunduh langsung tanpa harus compile:
 
 ## Fitur Utama
 
+- **⚡ Kecepatan Pengisian Baterai (Watt Cas Real-Time)**:
+  - Mengukur dan menampilkan daya pengisian aktual secara langsung (`⚡ X.X W`, misal: `⚡ 18.0W`, `⚡ 33.0W`, `⚡ 67.5W`).
+  - Menghitung daya presisi $P = V \times I$ melalui tegangan baterai native dan arus listrik (mA) via Android BatteryManager & sysfs kernel fallback.
+  - Tampil otomatis pada floating HUD saat perangkat terhubung ke pengisi daya (charger), dan otomatis tersembunyi saat dicabut.
+  - Kartu monitoring detail di layar aplikasi: status aktif cas, tipe sumber daya (AC Charger/USB/Wireless), tegangan aktual (Volt), dan arus (mA).
 - **Kecepatan Jaringan**: Kecepatan download (↓) dan upload (↑) aktual per detik.
 - **Latensi / Ping**: Pengukuran RTT via TCP socket (`1.1.1.1:53`).
 - **Frame Rate (FPS / Hz)**:
@@ -44,7 +50,7 @@ File installer APK siap pakai dapat diunduh langsung tanpa harus compile:
   - **Bentuk Sudut**: Kapsul Bulat Penuh (*Pill 24dp*) atau Kotak Membulat Modern (*Rounded 8dp*).
   - **Tombol Quick Boost HUD**: Toggle untuk memunculkan tombol boost langsung di widget overlay.
   - **Live Preview Real-Time**: Mockup widget langsung di layar aplikasi yang berubah seketika saat pengaturan diganti.
-  - **Pilihan Metrik Bebas**: Memilih metrik mana saja yang ingin dimunculkan/disembunyikan.
+  - **Pilihan Metrik Bebas**: Memilih metrik mana saja yang ingin dimunculkan/disembunyikan (Download, Upload, Ping, FPS, RAM, Suhu, Watt Cas).
 - **Floating Widget Fleksibel**: Bebas digeser (drag), deteksi tap tombol yang akurat, tidak menghalangi keyboard, dan otomatis jeda komputasi saat layar mati untuk menghemat daya.
 
 ---
@@ -83,11 +89,11 @@ cd monitoring_jaringan
 # Build APK debug
 ./gradlew assembleDebug
 ```
-Output APK berada di `app/build/outputs/apk/debug/app-debug.apk` atau file root `NetworkMonitor-v0.3.0-debug.apk`.
+Output APK berada di `app/build/outputs/apk/debug/app-debug.apk` atau file root `NetworkMonitor-v0.3.1-debug.apk`.
 
 ### Pasang ke Perangkat
 ```bash
-adb install -r NetworkMonitor-v0.3.0-debug.apk
+adb install -r NetworkMonitor-v0.3.1-debug.apk
 ```
 
 ---

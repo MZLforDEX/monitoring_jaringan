@@ -311,6 +311,11 @@ class NetworkMonitorService : Service() {
                     deviceStatsProvider.getBatteryTemperatureTenths(this@NetworkMonitorService)
                 } else 0
 
+                // Komputasi Daya Pengisian Baterai / Watt (hanya jika aktif)
+                val chargingInfo = if (config.showWatt) {
+                    deviceStatsProvider.getChargingInfo(this@NetworkMonitorService)
+                } else null
+
                 // Publikasikan ke UI overlay
                 withContext(Dispatchers.Main) {
                     floatingWindowManager.updateMetrics(
@@ -319,7 +324,9 @@ class NetworkMonitorService : Service() {
                         pingMs = latestPingMs,
                         fpsText = fpsText,
                         ramPercent = ramPercent,
-                        tempTenths = tempTenths
+                        tempTenths = tempTenths,
+                        isCharging = chargingInfo?.isCharging ?: false,
+                        wattText = chargingInfo?.formattedWatt ?: ""
                     )
                 }
 

@@ -12,6 +12,7 @@ data class MonitorConfig(
     val showFps: Boolean = true,
     val showRam: Boolean = true,
     val showTemp: Boolean = true,
+    val showWatt: Boolean = true,
     val bgStyle: Int = BG_STYLE_SEMI_TRANSPARENT,
     val textStyle: Int = TEXT_STYLE_COLORED,
     val textSizeSp: Float = TEXT_SIZE_NORMAL,
@@ -26,6 +27,7 @@ data class MonitorConfig(
         private const val KEY_SHOW_FPS = "key_show_fps"
         private const val KEY_SHOW_RAM = "key_show_ram"
         private const val KEY_SHOW_TEMP = "key_show_temp"
+        private const val KEY_SHOW_WATT = "key_show_watt"
 
         // Kustomisasi Tampilan Widget
         private const val KEY_BG_STYLE = "key_bg_style"
@@ -67,6 +69,7 @@ data class MonitorConfig(
                 showFps = prefs.getBoolean(KEY_SHOW_FPS, true),
                 showRam = prefs.getBoolean(KEY_SHOW_RAM, true),
                 showTemp = prefs.getBoolean(KEY_SHOW_TEMP, true),
+                showWatt = prefs.getBoolean(KEY_SHOW_WATT, true),
                 bgStyle = prefs.getInt(KEY_BG_STYLE, BG_STYLE_SEMI_TRANSPARENT),
                 textStyle = prefs.getInt(KEY_TEXT_STYLE, TEXT_STYLE_COLORED),
                 textSizeSp = prefs.getFloat(KEY_TEXT_SIZE, TEXT_SIZE_NORMAL),
@@ -87,6 +90,7 @@ data class MonitorConfig(
                 .putBoolean(KEY_SHOW_FPS, config.showFps)
                 .putBoolean(KEY_SHOW_RAM, config.showRam)
                 .putBoolean(KEY_SHOW_TEMP, config.showTemp)
+                .putBoolean(KEY_SHOW_WATT, config.showWatt)
                 .putInt(KEY_BG_STYLE, config.bgStyle)
                 .putInt(KEY_TEXT_STYLE, config.textStyle)
                 .putFloat(KEY_TEXT_SIZE, config.textSizeSp)

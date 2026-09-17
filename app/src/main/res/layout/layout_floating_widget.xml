@@ -117,7 +117,28 @@
         android:textSize="11sp"
         android:fontFamily="sans-serif-medium" />
 
-    <!-- 7. Separator & Tombol Quick Boost Langsung di Floating Widget (Opsional) -->
+    <View
+        android:id="@+id/sepTemp"
+        android:layout_width="1dp"
+        android:layout_height="10dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:background="#33FFFFFF"
+        android:visibility="gone" />
+
+    <!-- 7. Indikator Kecepatan Pengisian Daya (Watt Cas) - Otomatis tampil saat di-cas -->
+    <TextView
+        android:id="@+id/tvWatt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:includeFontPadding="false"
+        android:text="⚡ 0.0W"
+        android:textColor="#00E5FF"
+        android:textSize="11sp"
+        android:fontFamily="sans-serif-bold"
+        android:visibility="gone" />
+
+    <!-- 8. Separator & Tombol Quick Boost Langsung di Floating Widget (Opsional) -->
     <View
         android:id="@+id/sepBoost"
         android:layout_width="1dp"
@@ -132,7 +153,7 @@
         android:layout_height="wrap_content"
         android:includeFontPadding="false"
         android:text="⚡ BOOST"
-        android:textColor="#00E5FF"
+        android:textColor="#FFD54F"
         android:textSize="11sp"
         android:fontFamily="sans-serif-black"
         android:paddingStart="4dp"

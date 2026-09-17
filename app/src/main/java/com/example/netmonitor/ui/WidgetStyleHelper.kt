@@ -21,6 +21,7 @@ object WidgetStyleHelper {
         FPS,
         RAM,
         TEMP,
+        WATT,
         BOOST
     }
 
@@ -88,7 +89,8 @@ object WidgetStyleHelper {
                 MetricType.FPS -> Color.parseColor("#FFD54F")      // Warm Gold Yellow
                 MetricType.RAM -> Color.parseColor("#BA68C8")      // Lavender Purple
                 MetricType.TEMP -> Color.parseColor("#FF8A65")     // Warm Coral Red
-                MetricType.BOOST -> Color.parseColor("#00E5FF")    // Cyan Electric
+                MetricType.WATT -> Color.parseColor("#00E5FF")     // Electric Cyan Charging
+                MetricType.BOOST -> Color.parseColor("#FFD54F")    // Amber Yellow Boost
             }
         }
     }

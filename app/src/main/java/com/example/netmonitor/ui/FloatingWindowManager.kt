@@ -49,6 +49,7 @@ class FloatingWindowManager(private val context: Context) {
     private var tvFps: TextView? = null
     private var tvRam: TextView? = null
     private var tvTemp: TextView? = null
+    private var tvWatt: TextView? = null
     private var btnQuickBoost: TextView? = null
 
     // View garis pemisah (separators)
@@ -57,6 +58,7 @@ class FloatingWindowManager(private val context: Context) {
     private var sepPing: View? = null
     private var sepFps: View? = null
     private var sepRam: View? = null
+    private var sepTemp: View? = null
     private var sepBoost: View? = null
 
     private var isViewAttached: Boolean = false
@@ -73,6 +75,7 @@ class FloatingWindowManager(private val context: Context) {
     private var lastFpsText: String = ""
     private var lastRamText: String = ""
     private var lastTempText: String = ""
+    private var lastWattText: String = ""
 
     private val layoutParams: WindowManager.LayoutParams = WindowManager.LayoutParams().apply {
         type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -110,6 +113,7 @@ class FloatingWindowManager(private val context: Context) {
         tvFps = view.findViewById(R.id.tvFps)
         tvRam = view.findViewById(R.id.tvRam)
         tvTemp = view.findViewById(R.id.tvTemp)
+        tvWatt = view.findViewById(R.id.tvWatt)
         btnQuickBoost = view.findViewById(R.id.btnQuickBoost)
 
         sepDownload = view.findViewById(R.id.sepDownload)
@@ -117,6 +121,7 @@ class FloatingWindowManager(private val context: Context) {
         sepPing = view.findViewById(R.id.sepPing)
         sepFps = view.findViewById(R.id.sepFps)
         sepRam = view.findViewById(R.id.sepRam)
+        sepTemp = view.findViewById(R.id.sepTemp)
         sepBoost = view.findViewById(R.id.sepBoost)
 
         applyConfigInternal(currentConfig)
@@ -169,6 +174,7 @@ class FloatingWindowManager(private val context: Context) {
         tvFps?.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
         tvRam?.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
         tvTemp?.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+        tvWatt?.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
         btnQuickBoost?.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
 
         // 3. Kustomisasi Skema Warna Teks
@@ -179,6 +185,7 @@ class FloatingWindowManager(private val context: Context) {
         tvFps?.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.FPS, textStyle))
         tvRam?.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.RAM, textStyle))
         tvTemp?.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.TEMP, textStyle))
+        tvWatt?.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.WATT, textStyle))
         btnQuickBoost?.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.BOOST, textStyle))
 
         // 4. Kustomisasi Warna Separator
@@ -188,6 +195,7 @@ class FloatingWindowManager(private val context: Context) {
         sepPing?.setBackgroundColor(sepColor)
         sepFps?.setBackgroundColor(sepColor)
         sepRam?.setBackgroundColor(sepColor)
+        sepTemp?.setBackgroundColor(sepColor)
         sepBoost?.setBackgroundColor(sepColor)
 
         // 5. Visibilitas Metrik & Pemisah
@@ -197,24 +205,25 @@ class FloatingWindowManager(private val context: Context) {
         tvFps?.visibility = if (config.showFps) View.VISIBLE else View.GONE
         tvRam?.visibility = if (config.showRam) View.VISIBLE else View.GONE
         tvTemp?.visibility = if (config.showTemp) View.VISIBLE else View.GONE
+        // tvWatt dan sepTemp visibilitasnya dikontrol dinamis oleh updateMetrics() saat charging
         btnQuickBoost?.visibility = if (config.showQuickBoost) View.VISIBLE else View.GONE
 
-        val hasAfterDown = config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp || config.showQuickBoost
+        val hasAfterDown = config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp || (config.showWatt && tvWatt?.visibility == View.VISIBLE) || config.showQuickBoost
         sepDownload?.visibility = if (config.showDownload && hasAfterDown) View.VISIBLE else View.GONE
 
-        val hasAfterUp = config.showPing || config.showFps || config.showRam || config.showTemp || config.showQuickBoost
+        val hasAfterUp = config.showPing || config.showFps || config.showRam || config.showTemp || (config.showWatt && tvWatt?.visibility == View.VISIBLE) || config.showQuickBoost
         sepUpload?.visibility = if (config.showUpload && hasAfterUp) View.VISIBLE else View.GONE
 
-        val hasAfterPing = config.showFps || config.showRam || config.showTemp || config.showQuickBoost
+        val hasAfterPing = config.showFps || config.showRam || config.showTemp || (config.showWatt && tvWatt?.visibility == View.VISIBLE) || config.showQuickBoost
         sepPing?.visibility = if (config.showPing && hasAfterPing) View.VISIBLE else View.GONE
 
-        val hasAfterFps = config.showRam || config.showTemp || config.showQuickBoost
+        val hasAfterFps = config.showRam || config.showTemp || (config.showWatt && tvWatt?.visibility == View.VISIBLE) || config.showQuickBoost
         sepFps?.visibility = if (config.showFps && hasAfterFps) View.VISIBLE else View.GONE
 
-        val hasAfterRam = config.showTemp || config.showQuickBoost
+        val hasAfterRam = config.showTemp || (config.showWatt && tvWatt?.visibility == View.VISIBLE) || config.showQuickBoost
         sepRam?.visibility = if (config.showRam && hasAfterRam) View.VISIBLE else View.GONE
 
-        val hasAnyBeforeBoost = config.showDownload || config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp
+        val hasAnyBeforeBoost = config.showDownload || config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp || (config.showWatt && tvWatt?.visibility == View.VISIBLE)
         sepBoost?.visibility = if (config.showQuickBoost && hasAnyBeforeBoost) View.VISIBLE else View.GONE
 
         // Jika view sudah terpasang, minta WindowManager menyesuaikan ukuran layout
@@ -270,12 +279,14 @@ class FloatingWindowManager(private val context: Context) {
                 tvFps = null
                 tvRam = null
                 tvTemp = null
+                tvWatt = null
                 btnQuickBoost = null
                 sepDownload = null
                 sepUpload = null
                 sepPing = null
                 sepFps = null
                 sepRam = null
+                sepTemp = null
                 sepBoost = null
                 isViewAttached = false
                 lastDownText = ""
@@ -284,6 +295,7 @@ class FloatingWindowManager(private val context: Context) {
                 lastFpsText = ""
                 lastRamText = ""
                 lastTempText = ""
+                lastWattText = ""
             }
         }
     }
@@ -383,7 +395,9 @@ class FloatingWindowManager(private val context: Context) {
         pingMs: Int,
         fpsText: String,
         ramPercent: Int,
-        tempTenths: Int
+        tempTenths: Int,
+        isCharging: Boolean = false,
+        wattText: String = ""
     ) {
         if (!isViewAttached || floatingView == null) return
 
@@ -440,6 +454,33 @@ class FloatingWindowManager(private val context: Context) {
                         tvTemp?.text = newTempText
                         lastTempText = newTempText
                     }
+                }
+
+                // 7. Daya Pengisian (Watt) - Tampil otomatis hanya saat perangkat di-cas
+                val shouldShowWatt = currentConfig.showWatt && isCharging && wattText.isNotEmpty()
+                if (shouldShowWatt) {
+                    if (tvWatt?.visibility != View.VISIBLE) {
+                        tvWatt?.visibility = View.VISIBLE
+                    }
+                    if (lastWattText != wattText) {
+                        tvWatt?.text = wattText
+                        lastWattText = wattText
+                    }
+                    val hasBeforeWatt = currentConfig.showDownload || currentConfig.showUpload || currentConfig.showPing || currentConfig.showFps || currentConfig.showRam || currentConfig.showTemp
+                    sepTemp?.visibility = if (hasBeforeWatt) View.VISIBLE else View.GONE
+                } else {
+                    if (tvWatt?.visibility != View.GONE) {
+                        tvWatt?.visibility = View.GONE
+                    }
+                    if (sepTemp?.visibility != View.GONE) {
+                        sepTemp?.visibility = View.GONE
+                    }
+                }
+
+                // Separator tombol Quick Boost
+                if (currentConfig.showQuickBoost) {
+                    val hasBeforeBoost = currentConfig.showDownload || currentConfig.showUpload || currentConfig.showPing || currentConfig.showFps || currentConfig.showRam || currentConfig.showTemp || shouldShowWatt
+                    sepBoost?.visibility = if (hasBeforeBoost) View.VISIBLE else View.GONE
                 }
             }
         }

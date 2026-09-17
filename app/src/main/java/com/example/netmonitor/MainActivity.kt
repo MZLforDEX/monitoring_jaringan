@@ -23,6 +23,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import com.example.netmonitor.engine.DeviceStatsProvider
 import com.example.netmonitor.engine.FpsProvider
 import com.example.netmonitor.engine.GameBooster
 import com.example.netmonitor.engine.ShizukuManager
@@ -30,8 +31,10 @@ import com.example.netmonitor.model.MonitorConfig
 import com.example.netmonitor.ui.WidgetStyleHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -65,6 +68,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var tvBoostResultTitle: TextView
     private lateinit var tvBoostResultDetails: TextView
 
+    // Charging Info Views
+    private lateinit var tvChargingWattMain: TextView
+    private lateinit var tvChargingStatusMain: TextView
+    private lateinit var tvChargingDetailsMain: TextView
+    private lateinit var tvChargingBadge: TextView
+    private lateinit var deviceStatsProvider: DeviceStatsProvider
+    private var uiUpdateJob: Job? = null
+
     // Live Preview Views
     private lateinit var previewRootWidget: View
     private lateinit var previewTvDownload: TextView
@@ -78,6 +89,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var previewTvRam: TextView
     private lateinit var previewSepRam: View
     private lateinit var previewTvTemp: TextView
+    private lateinit var previewSepTemp: View
+    private lateinit var previewTvWatt: TextView
     private lateinit var previewSepBoost: View
     private lateinit var previewBtnBoost: TextView
 
@@ -112,6 +125,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var cbFps: CheckBox
     private lateinit var cbRam: CheckBox
     private lateinit var cbTemp: CheckBox
+    private lateinit var cbWatt: CheckBox
 
     // Status FPS & ADB Command View & Shizuku
     private lateinit var tvFpsStatus: TextView
@@ -200,7 +214,24 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         updateUiState()
-        updateRamDisplay()
+        startUiUpdateLoop()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        uiUpdateJob?.cancel()
+        uiUpdateJob = null
+    }
+
+    private fun startUiUpdateLoop() {
+        uiUpdateJob?.cancel()
+        uiUpdateJob = mainScope.launch {
+            while (true) {
+                updateRamDisplay()
+                updateChargingDisplay()
+                delay(1500L)
+            }
+        }
     }
 
     private fun initViews() {
@@ -221,6 +252,13 @@ class MainActivity : ComponentActivity() {
         tvBoostResultTitle = findViewById(R.id.tvBoostResultTitle)
         tvBoostResultDetails = findViewById(R.id.tvBoostResultDetails)
 
+        // Charging Info Views
+        tvChargingWattMain = findViewById(R.id.tvChargingWattMain)
+        tvChargingStatusMain = findViewById(R.id.tvChargingStatusMain)
+        tvChargingDetailsMain = findViewById(R.id.tvChargingDetailsMain)
+        tvChargingBadge = findViewById(R.id.tvChargingBadge)
+        deviceStatsProvider = DeviceStatsProvider(this)
+
         // Live Preview Views
         previewRootWidget = findViewById(R.id.previewRootWidget)
         previewTvDownload = findViewById(R.id.previewTvDownload)
@@ -234,6 +272,8 @@ class MainActivity : ComponentActivity() {
         previewTvRam = findViewById(R.id.previewTvRam)
         previewSepRam = findViewById(R.id.previewSepRam)
         previewTvTemp = findViewById(R.id.previewTvTemp)
+        previewSepTemp = findViewById(R.id.previewSepTemp)
+        previewTvWatt = findViewById(R.id.previewTvWatt)
         previewSepBoost = findViewById(R.id.previewSepBoost)
         previewBtnBoost = findViewById(R.id.previewBtnBoost)
 
@@ -268,6 +308,7 @@ class MainActivity : ComponentActivity() {
         cbFps = findViewById(R.id.cbFps)
         cbRam = findViewById(R.id.cbRam)
         cbTemp = findViewById(R.id.cbTemp)
+        cbWatt = findViewById(R.id.cbWatt)
 
         // FPS & Shizuku
         tvFpsStatus = findViewById(R.id.tvFpsStatus)
@@ -322,6 +363,7 @@ class MainActivity : ComponentActivity() {
         cbFps.isChecked = config.showFps
         cbRam.isChecked = config.showRam
         cbTemp.isChecked = config.showTemp
+        cbWatt.isChecked = config.showWatt
 
         // Sinkronisasi live preview awal
         updateLivePreview(config)
@@ -402,6 +444,7 @@ class MainActivity : ComponentActivity() {
         cbFps.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
         cbRam.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
         cbTemp.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
+        cbWatt.setOnCheckedChangeListener { _, _ -> onSettingChanged() }
     }
 
     /**
@@ -423,6 +466,7 @@ class MainActivity : ComponentActivity() {
         previewTvFps.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
         previewTvRam.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
         previewTvTemp.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+        previewTvWatt.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
         previewBtnBoost.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
 
         // 3. Text Colors
@@ -433,6 +477,7 @@ class MainActivity : ComponentActivity() {
         previewTvFps.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.FPS, textStyle))
         previewTvRam.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.RAM, textStyle))
         previewTvTemp.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.TEMP, textStyle))
+        previewTvWatt.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.WATT, textStyle))
         previewBtnBoost.setTextColor(WidgetStyleHelper.getMetricTextColor(WidgetStyleHelper.MetricType.BOOST, textStyle))
 
         // 4. Separator Colors
@@ -442,6 +487,7 @@ class MainActivity : ComponentActivity() {
         previewSepPing.setBackgroundColor(sepColor)
         previewSepFps.setBackgroundColor(sepColor)
         previewSepRam.setBackgroundColor(sepColor)
+        previewSepTemp.setBackgroundColor(sepColor)
         previewSepBoost.setBackgroundColor(sepColor)
 
         // 5. Visibility
@@ -451,24 +497,28 @@ class MainActivity : ComponentActivity() {
         previewTvFps.visibility = if (config.showFps) View.VISIBLE else View.GONE
         previewTvRam.visibility = if (config.showRam) View.VISIBLE else View.GONE
         previewTvTemp.visibility = if (config.showTemp) View.VISIBLE else View.GONE
+        previewTvWatt.visibility = if (config.showWatt) View.VISIBLE else View.GONE
         previewBtnBoost.visibility = if (config.showQuickBoost) View.VISIBLE else View.GONE
 
-        val hasAfterDown = config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp || config.showQuickBoost
+        val hasAfterDown = config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp || config.showWatt || config.showQuickBoost
         previewSepDownload.visibility = if (config.showDownload && hasAfterDown) View.VISIBLE else View.GONE
 
-        val hasAfterUp = config.showPing || config.showFps || config.showRam || config.showTemp || config.showQuickBoost
+        val hasAfterUp = config.showPing || config.showFps || config.showRam || config.showTemp || config.showWatt || config.showQuickBoost
         previewSepUpload.visibility = if (config.showUpload && hasAfterUp) View.VISIBLE else View.GONE
 
-        val hasAfterPing = config.showFps || config.showRam || config.showTemp || config.showQuickBoost
+        val hasAfterPing = config.showFps || config.showRam || config.showTemp || config.showWatt || config.showQuickBoost
         previewSepPing.visibility = if (config.showPing && hasAfterPing) View.VISIBLE else View.GONE
 
-        val hasAfterFps = config.showRam || config.showTemp || config.showQuickBoost
+        val hasAfterFps = config.showRam || config.showTemp || config.showWatt || config.showQuickBoost
         previewSepFps.visibility = if (config.showFps && hasAfterFps) View.VISIBLE else View.GONE
 
-        val hasAfterRam = config.showTemp || config.showQuickBoost
+        val hasAfterRam = config.showTemp || config.showWatt || config.showQuickBoost
         previewSepRam.visibility = if (config.showRam && hasAfterRam) View.VISIBLE else View.GONE
 
-        val hasAnyBeforeBoost = config.showDownload || config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp
+        val hasBeforeWatt = config.showDownload || config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp
+        previewSepTemp.visibility = if (config.showWatt && hasBeforeWatt) View.VISIBLE else View.GONE
+
+        val hasAnyBeforeBoost = config.showDownload || config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp || config.showWatt
         previewSepBoost.visibility = if (config.showQuickBoost && hasAnyBeforeBoost) View.VISIBLE else View.GONE
     }
 
@@ -508,6 +558,7 @@ class MainActivity : ComponentActivity() {
             showFps = cbFps.isChecked,
             showRam = cbRam.isChecked,
             showTemp = cbTemp.isChecked,
+            showWatt = cbWatt.isChecked,
             bgStyle = bgStyle,
             textStyle = textStyle,
             textSizeSp = textSizeSp,
@@ -531,6 +582,34 @@ class MainActivity : ComponentActivity() {
         val stats = GameBooster.getRamStats(this)
         tvRamStats.text = stats.formattedText
         pbRamUsage.progress = stats.usedPercent
+    }
+
+    /**
+     * Memperbarui status dan daya pengisian baterai secara real-time di antarmuka utama.
+     */
+    private fun updateChargingDisplay() {
+        val chargingInfo = deviceStatsProvider.getChargingInfo(this)
+        if (chargingInfo.isCharging) {
+            tvChargingWattMain.text = chargingInfo.formattedWatt
+            tvChargingWattMain.setTextColor(0xFF00E5FF.toInt())
+            tvChargingStatusMain.text = "Mengisi Daya Aktif (${chargingInfo.pluggedType})"
+            tvChargingDetailsMain.text = "Tegangan: %.2fV • Arus: %dmA".format(
+                java.util.Locale.US,
+                chargingInfo.voltageVolts,
+                chargingInfo.currentMa
+            )
+            tvChargingBadge.text = "CHARGING"
+            tvChargingBadge.setTextColor(0xFF00E5FF.toInt())
+            tvChargingBadge.setBackgroundColor(0x2600E5FF.toInt())
+        } else {
+            tvChargingWattMain.text = "⚡ -- W"
+            tvChargingWattMain.setTextColor(0xFF757575.toInt())
+            tvChargingStatusMain.text = "Tidak Sedang Di-cas (Baterai)"
+            tvChargingDetailsMain.text = "Sambungkan pengisi daya (charger) untuk melihat kecepatan Watt"
+            tvChargingBadge.text = "STANDBY"
+            tvChargingBadge.setTextColor(0xFF9E9E9E.toInt())
+            tvChargingBadge.setBackgroundColor(0x229E9E9E.toInt())
+        }
     }
 
     /**
