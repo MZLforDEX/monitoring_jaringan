@@ -72,6 +72,10 @@ class NetworkMonitorService : Service() {
         fun triggerBoostFromAnywhere() {
             activeInstance?.triggerGameBoost()
         }
+
+        fun setAodActive(isActive: Boolean) {
+            activeInstance?.onAodStateChanged(isActive)
+        }
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -83,6 +87,12 @@ class NetworkMonitorService : Service() {
 
     @Volatile
     private var currentConfig: MonitorConfig = MonitorConfig()
+
+    @Volatile
+    private var isAodActive: Boolean = false
+
+    @Volatile
+    private var aodExitTimestamp: Long = 0L
 
     private var metricsMonitorJob: Job? = null
     private var pingMonitorJob: Job? = null
@@ -97,17 +107,23 @@ class NetworkMonitorService : Service() {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     pauseMonitoring()
-                    if (currentConfig.enableChargingAod) {
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    val isRecentAodExit = (now - aodExitTimestamp) < 3000L
+                    if (currentConfig.enableChargingAod && !isAodActive && !isRecentAodExit) {
                         checkAndLaunchChargingAod()
                     }
                 }
 
                 Intent.ACTION_SCREEN_ON -> {
-                    resumeMonitoring()
+                    aodExitTimestamp = 0L
+                    if (!isAodActive) {
+                        resumeMonitoring()
+                    }
                 }
 
                 Intent.ACTION_POWER_CONNECTED -> {
-                    if (currentConfig.enableChargingAod) {
+                    aodExitTimestamp = 0L
+                    if (currentConfig.enableChargingAod && !isAodActive) {
                         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
                         val isInteractive = powerManager?.isInteractive ?: true
                         val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
@@ -117,6 +133,22 @@ class NetworkMonitorService : Service() {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    fun onAodStateChanged(active: Boolean) {
+        isAodActive = active
+        if (!active) {
+            aodExitTimestamp = android.os.SystemClock.elapsedRealtime()
+        }
+        floatingWindowManager.setAodActive(active)
+        if (active) {
+            pauseMonitoring()
+        } else {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            if (powerManager?.isInteractive == true) {
+                resumeMonitoring()
             }
         }
     }

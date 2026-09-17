@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.example.netmonitor.NetworkMonitorService
 import com.example.netmonitor.R
 import com.example.netmonitor.engine.DeviceStatsProvider
 import kotlinx.coroutines.CoroutineScope
@@ -35,13 +36,17 @@ import kotlin.random.Random
 /**
  * Layar Always-On Display (AOD) ultra-ringan khusus saat pengisian daya.
  *
- * Keunggulan Desain & Efisiensi Energi:
- * 1. True AMOLED Pure Black (#000000): Piksel OLED padam 100% sehingga konsumsi daya layar mendekati nol.
- * 2. Minimum Screen Brightness (0.01f): Mengurangi radiasi daya display saat ruangan gelap/malam hari.
- * 3. Anti Burn-In Pixel Shifting: Menggeser konten ±15 piksel secara periodik setiap 60 detik.
- * 4. Ultra-Low Refresh Rate Polling: Update metrik daya watt hanya setiap 3.000 ms di background coroutine.
- * 5. Instant Dismiss Gesture: Double-tap atau swipe ke arah mana saja untuk langsung keluar dari mode AOD.
- * 6. Otomatis Berhenti: Layar langsung keluar jika kabel charger dilepas (ACTION_POWER_DISCONNECTED).
+ * Keunggulan Desain & Efisiensi Energi (Optimal untuk Fast Charging):
+ * 1. Layar Kunci Murni & Widget Hilang: Saat AOD aktif, floating widget dihilangkan total dan
+ *    monitoring background service dijeda sehingga CPU/GPU bebas beban (keadaan identik seperti layar kunci).
+ * 2. True AMOLED Pure Black (#000000): Piksel OLED padam 100% sehingga konsumsi daya display mendekati nol.
+ * 3. Minimum Screen Brightness (0.01f) & Button Lights Off: Mencegah panas pada layar & baterai.
+ * 4. Refresh Rate Terendah (30Hz / 60Hz): Menurunkan beban display controller agar SoC tetap dingin.
+ * 5. Anti Burn-In Pixel Shifting: Menggeser konten ±15 piksel secara periodik setiap 60 detik.
+ * 6. Ultra-Low Refresh Rate Polling: Update metrik daya watt hanya setiap 3.000 ms di background coroutine.
+ * 7. Instant Dismiss Gesture: Double-tap atau swipe ke arah mana saja untuk langsung keluar dari mode AOD.
+ * 8. Otomatis Berhenti: Layar langsung keluar jika kabel charger dilepas (ACTION_POWER_DISCONNECTED)
+ *    atau jika pengguna menekan tombol power untuk mematikan layar total (ACTION_SCREEN_OFF).
  */
 class ChargingAodActivity : ComponentActivity() {
 
@@ -69,11 +74,17 @@ class ChargingAodActivity : ComponentActivity() {
         }
     }
 
-    // Receiver untuk mendeteksi saat kabel charger dicabut
-    private val powerDisconnectedReceiver = object : BroadcastReceiver() {
+    // Receiver untuk mendeteksi saat kabel charger dicabut atau layar dimatikan manual via tombol power
+    private val systemStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == Intent.ACTION_POWER_DISCONNECTED) {
-                finish()
+            when (intent?.action) {
+                Intent.ACTION_POWER_DISCONNECTED -> {
+                    finish()
+                }
+                Intent.ACTION_SCREEN_OFF -> {
+                    // Pengguna menekan tombol power untuk mematikan layar total, tutup AOD
+                    finish()
+                }
             }
         }
     }
@@ -86,15 +97,27 @@ class ChargingAodActivity : ComponentActivity() {
 
         initViews()
         setupGestureDetection()
-        registerPowerReceiver()
+        registerSystemReceiver()
         startStatsUpdateLoop()
 
         // Mulai timer proteksi anti burn-in
         mainHandler.postDelayed(burnInShiftRunnable, BURN_IN_SHIFT_INTERVAL_MS)
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Beritahu service bahwa AOD sedang aktif agar floating HUD disembunyikan & loop dijeda
+        NetworkMonitorService.setAodActive(true)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Kembalikan visibilitas floating HUD saat AOD tidak lagi di layar
+        NetworkMonitorService.setAodActive(false)
+    }
+
     private fun configureWindowAndImmersive() {
-        // Izinkan activity muncul saat layar terkunci dan nyalakan layar
+        // Izinkan activity muncul di atas layar kunci dan nyalakan layar
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -107,9 +130,33 @@ class ChargingAodActivity : ComponentActivity() {
             WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
         )
 
-        // Setel kecerahan layar ke level minimum (0.01f) untuk hemat baterai maksimal pada panel AMOLED
+        window.setBackgroundDrawableResource(android.R.color.black)
+
+        // Optimasi parameter display: Kecerahan minimal & matikan lampu tombol fisik
         val lp = window.attributes
         lp.screenBrightness = 0.01f
+        lp.buttonBrightness = 0f
+
+        // Turunkan refresh rate display ke mode frekuensi terendah (misal 60Hz / 30Hz)
+        // agar display controller hemat daya dan suhu baterai/SoC tetap dingin demi fast charging optimal
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                @Suppress("DEPRECATION")
+                val disp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    display
+                } else {
+                    windowManager.defaultDisplay
+                }
+                val modes = disp?.supportedModes
+                val minRefreshMode = modes?.minByOrNull { it.refreshRate }
+                if (minRefreshMode != null) {
+                    lp.preferredDisplayModeId = minRefreshMode.modeId
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        lp.preferredRefreshRate = minRefreshMode.refreshRate
+                    }
+                }
+            } catch (_: Exception) {}
+        }
         window.attributes = lp
 
         // Sembunyikan system status bar dan navigation bar (Immersive Mode)
@@ -159,7 +206,6 @@ class ChargingAodActivity : ComponentActivity() {
             }
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                // Opsional: Tap sekali dapat menyegarkan timer atau diabaikan agar tidak sengaja keluar
                 return super.onSingleTapConfirmed(e)
             }
         })
@@ -191,12 +237,15 @@ class ChargingAodActivity : ComponentActivity() {
             .start()
     }
 
-    private fun registerPowerReceiver() {
+    private fun registerSystemReceiver() {
         if (!isReceiverRegistered) {
-            val filter = IntentFilter(Intent.ACTION_POWER_DISCONNECTED)
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_POWER_DISCONNECTED)
+                addAction(Intent.ACTION_SCREEN_OFF)
+            }
             ContextCompat.registerReceiver(
                 this,
-                powerDisconnectedReceiver,
+                systemStateReceiver,
                 filter,
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
@@ -236,7 +285,7 @@ class ChargingAodActivity : ComponentActivity() {
 
         if (isReceiverRegistered) {
             try {
-                unregisterReceiver(powerDisconnectedReceiver)
+                unregisterReceiver(systemStateReceiver)
             } catch (_: IllegalArgumentException) {
             } finally {
                 isReceiverRegistered = false

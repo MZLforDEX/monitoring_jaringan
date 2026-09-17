@@ -66,8 +66,22 @@ class FloatingWindowManager(private val context: Context) {
     @Volatile
     private var currentConfig: MonitorConfig = MonitorConfig.load(context)
 
+    @Volatile
+    private var isAodActive: Boolean = false
+
     // Listener saat tombol Quick Boost di floating HUD diketuk pengguna
     var onQuickBoostListener: (() -> Unit)? = null
+
+    /**
+     * Menyembunyikan floating widget sepenuhnya saat mode AOD aktif
+     * dan menampilkannya kembali saat mode AOD ditutup.
+     */
+    fun setAodActive(active: Boolean) {
+        isAodActive = active
+        mainHandler.post {
+            floatingView?.visibility = if (active) View.GONE else View.VISIBLE
+        }
+    }
 
     // Cache teks terakhir guna mencegah pemanggilan setText dan measure pass yang redundan
     private var lastDownText: String = ""
@@ -133,6 +147,10 @@ class FloatingWindowManager(private val context: Context) {
 
         applyConfigInternal(currentConfig)
         setupTouchListener(view)
+
+        if (isAodActive) {
+            view.visibility = View.GONE
+        }
 
         try {
             windowManager.addView(view, layoutParams)
@@ -238,6 +256,10 @@ class FloatingWindowManager(private val context: Context) {
             layoutParams.flags = layoutParams.flags or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
         } else {
             layoutParams.flags = layoutParams.flags and WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED.inv()
+        }
+
+        if (isAodActive) {
+            floatingView?.visibility = View.GONE
         }
 
         // Jika view sudah terpasang, minta WindowManager menyesuaikan ukuran layout dan flags
@@ -422,7 +444,7 @@ class FloatingWindowManager(private val context: Context) {
         isCharging: Boolean = false,
         wattText: String = ""
     ) {
-        if (!isViewAttached || floatingView == null) return
+        if (!isViewAttached || floatingView == null || isAodActive) return
 
         val updateAction = {
             if (isViewAttached && floatingView != null) {
