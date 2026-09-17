@@ -4,6 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.PixelFormat
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -39,14 +44,16 @@ import kotlin.random.Random
  * Keunggulan Desain & Efisiensi Energi (Optimal untuk Fast Charging):
  * 1. Layar Kunci Murni & Widget Hilang: Saat AOD aktif, floating widget dihilangkan total dan
  *    monitoring background service dijeda sehingga CPU/GPU bebas beban (keadaan identik seperti layar kunci).
- * 2. True AMOLED Pure Black (#000000): Piksel OLED padam 100% sehingga konsumsi daya display mendekati nol.
+ * 2. True AMOLED Pure Black (#000000) & Surface OPAQUE: Bebas overdraw, piksel hitam padam 100%.
  * 3. Minimum Screen Brightness (0.01f) & Button Lights Off: Mencegah panas pada layar & baterai.
  * 4. Refresh Rate Terendah (30Hz / 60Hz): Menurunkan beban display controller agar SoC tetap dingin.
- * 5. Anti Burn-In Pixel Shifting: Menggeser konten ±15 piksel secara periodik setiap 60 detik.
- * 6. Ultra-Low Refresh Rate Polling: Update metrik daya watt hanya setiap 3.000 ms di background coroutine.
- * 7. Instant Dismiss Gesture: Double-tap atau swipe ke arah mana saja untuk langsung keluar dari mode AOD.
- * 8. Otomatis Berhenti: Layar langsung keluar jika kabel charger dilepas (ACTION_POWER_DISCONNECTED)
- *    atau jika pengguna menekan tombol power untuk mematikan layar total (ACTION_SCREEN_OFF).
+ * 5. Sensor Proximity Blackout: Layar padam 100% saat HP diletakkan menghadap ke bawah atau di saku.
+ * 6. Anti Burn-In Pixel Shifting: Menggeser konten ±15 piksel secara periodik setiap 60 detik.
+ * 7. Ultra-Low Refresh Rate Polling: Update metrik daya watt hanya setiap 3.000 ms di background coroutine.
+ * 8. Dynamic Fast-Charge Tier: Warna & label adaptif (Hyper / Turbo / Fast Charge).
+ * 9. Instant Dismiss Gesture: Double-tap atau swipe ke arah mana saja untuk langsung keluar dari mode AOD.
+ * 10. Otomatis Berhenti: Layar langsung keluar jika kabel charger dilepas (ACTION_POWER_DISCONNECTED)
+ *     atau jika pengguna menekan tombol power untuk mematikan layar total (ACTION_SCREEN_OFF).
  */
 class ChargingAodActivity : ComponentActivity() {
 
@@ -63,6 +70,27 @@ class ChargingAodActivity : ComponentActivity() {
     private var isReceiverRegistered = false
 
     private lateinit var gestureDetector: GestureDetector
+
+    // Sensor Proximity untuk memadamkan layar saat ponsel ditaruh tengkurap (face-down)
+    private var sensorManager: SensorManager? = null
+    private var proximitySensor: Sensor? = null
+    private val proximityListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            val distance = event?.values?.getOrNull(0) ?: return
+            val maxRange = proximitySensor?.maximumRange ?: 5f
+            val isNear = distance < maxRange.coerceAtMost(5f)
+            // Layar mati total (100% piksel padam) saat HP menghadap bawah di meja atau di dalam saku
+            containerAodContent.visibility = if (isNear) View.INVISIBLE else View.VISIBLE
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
+
+    // Cache UI agar tidak memicu measure/layout pass jika teks metrik tidak berubah
+    private var lastWatt: String = ""
+    private var lastBattery: String = ""
+    private var lastDetails: String = ""
+    private var nonChargingCounter: Int = 0
 
     // Runnable untuk pergeseran piksel anti burn-in (setiap 60 detik)
     private val burnInShiftRunnable = object : Runnable {
@@ -108,10 +136,18 @@ class ChargingAodActivity : ComponentActivity() {
         super.onStart()
         // Beritahu service bahwa AOD sedang aktif agar floating HUD disembunyikan & loop dijeda
         NetworkMonitorService.setAodActive(true)
+
+        // Daftarkan listener sensor proximity jika tersedia di hardware
+        proximitySensor?.let { sensor ->
+            sensorManager?.registerListener(proximityListener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+        }
     }
 
     override fun onStop() {
         super.onStop()
+        // Hentikan sensor proximity
+        sensorManager?.unregisterListener(proximityListener)
+
         // Kembalikan visibilitas floating HUD saat AOD tidak lagi di layar
         NetworkMonitorService.setAodActive(false)
     }
@@ -127,18 +163,21 @@ class ChargingAodActivity : ComponentActivity() {
         window.addFlags(
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         )
 
+        // Set permukaan window OPAQUE untuk mengeliminasi blending overhead pada GPU / SurfaceFlinger
+        window.setFormat(PixelFormat.OPAQUE)
         window.setBackgroundDrawableResource(android.R.color.black)
 
-        // Optimasi parameter display: Kecerahan minimal & matikan lampu tombol fisik
+        // Optimasi parameter display: Kecerahan minimal (0.01f) & matikan lampu tombol fisik
         val lp = window.attributes
         lp.screenBrightness = 0.01f
         lp.buttonBrightness = 0f
 
         // Turunkan refresh rate display ke mode frekuensi terendah (misal 60Hz / 30Hz)
-        // agar display controller hemat daya dan suhu baterai/SoC tetap dingin demi fast charging optimal
+        // dengan mempertahankan resolusi native agar display controller hemat daya dan SoC tetap dingin
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
                 @Suppress("DEPRECATION")
@@ -147,8 +186,12 @@ class ChargingAodActivity : ComponentActivity() {
                 } else {
                     windowManager.defaultDisplay
                 }
+                val currentMode = disp?.mode
                 val modes = disp?.supportedModes
-                val minRefreshMode = modes?.minByOrNull { it.refreshRate }
+                val matchingModes = if (currentMode != null) {
+                    modes?.filter { it.physicalWidth == currentMode.physicalWidth && it.physicalHeight == currentMode.physicalHeight }
+                } else modes?.toList()
+                val minRefreshMode = matchingModes?.minByOrNull { it.refreshRate }
                 if (minRefreshMode != null) {
                     lp.preferredDisplayModeId = minRefreshMode.modeId
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -184,6 +227,9 @@ class ChargingAodActivity : ComponentActivity() {
         tvAodBattery = findViewById(R.id.tvAodBattery)
         tvAodDetails = findViewById(R.id.tvAodDetails)
         deviceStatsProvider = DeviceStatsProvider(this)
+
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        proximitySensor = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
     }
 
     private fun setupGestureDetection() {
@@ -233,7 +279,7 @@ class ChargingAodActivity : ComponentActivity() {
         containerAodContent.animate()
             .translationX(shiftX)
             .translationY(shiftY)
-            .setDuration(800L)
+            .setDuration(400L)
             .start()
     }
 
@@ -259,18 +305,45 @@ class ChargingAodActivity : ComponentActivity() {
             while (isActive) {
                 val info = deviceStatsProvider.getChargingInfo(this@ChargingAodActivity)
 
-                // Jika perangkat tidak lagi di-cas, otomatis tutup AOD
+                // Debounce deteksi non-charging (mencegah keluar prematur saat fase handshake voltase awal)
                 if (!info.isCharging) {
-                    finish()
-                    break
+                    nonChargingCounter++
+                    if (nonChargingCounter >= 2) {
+                        finish()
+                        break
+                    }
+                } else {
+                    nonChargingCounter = 0
                 }
 
-                tvAodWatt.text = info.formattedWatt.ifEmpty { "⚡ 0.0 W" }
-                tvAodBattery.text = "${info.batteryLevel}% • ${info.pluggedType}"
+                val newWatt = info.formattedWatt.ifEmpty { "⚡ 0.0 W" }
+                if (lastWatt != newWatt) {
+                    tvAodWatt.text = newWatt
+                    lastWatt = newWatt
+
+                    // Warna aksen dinamis berdasarkan kelas kecepatan daya cas
+                    val wattColor = when {
+                        info.watt >= 30.0 -> 0xFF00E5FF.toInt() // Cyan Neon (Turbo / Hyper)
+                        info.watt >= 15.0 -> 0xFF00E676.toInt() // Hijau Emerald Neon (Fast Charge)
+                        else -> 0xFF80D8FF.toInt()              // Biru Langit (Standar)
+                    }
+                    tvAodWatt.setTextColor(wattColor)
+                }
+
+                val tierText = if (info.chargeSpeedTier.isNotEmpty()) " • ${info.chargeSpeedTier}" else ""
+                val newBattery = "${info.batteryLevel}%$tierText • ${info.pluggedType}"
+                if (lastBattery != newBattery) {
+                    tvAodBattery.text = newBattery
+                    lastBattery = newBattery
+                }
 
                 val tempC = String.format(Locale.US, "%.1f°C", info.tempTenths / 10.0)
                 val voltV = String.format(Locale.US, "%.1fV", info.voltageVolts)
-                tvAodDetails.text = "$voltV • ${info.currentMa}mA • $tempC"
+                val newDetails = "$voltV • ${info.currentMa}mA • $tempC"
+                if (lastDetails != newDetails) {
+                    tvAodDetails.text = newDetails
+                    lastDetails = newDetails
+                }
 
                 delay(AOD_UPDATE_INTERVAL_MS)
             }

@@ -29,7 +29,8 @@ class DeviceStatsProvider(context: Context) {
         val currentMa: Int,
         val pluggedType: String,
         val tempTenths: Int = 0,
-        val batteryLevel: Int = 0
+        val batteryLevel: Int = 0,
+        val chargeSpeedTier: String = ""
     )
 
     private val activityManager: ActivityManager =
@@ -82,7 +83,8 @@ class DeviceStatsProvider(context: Context) {
 
         val isCharging = plugged != 0 && (
             status == BatteryManager.BATTERY_STATUS_CHARGING ||
-            status == BatteryManager.BATTERY_STATUS_FULL
+            status == BatteryManager.BATTERY_STATUS_FULL ||
+            status == BatteryManager.BATTERY_STATUS_UNKNOWN
         )
 
         val pluggedType = when (plugged) {
@@ -101,7 +103,8 @@ class DeviceStatsProvider(context: Context) {
                 currentMa = 0,
                 pluggedType = pluggedType,
                 tempTenths = tempTenths,
-                batteryLevel = batteryLevel
+                batteryLevel = batteryLevel,
+                chargeSpeedTier = ""
             )
         }
 
@@ -157,6 +160,14 @@ class DeviceStatsProvider(context: Context) {
 
         val formattedWatt = String.format(Locale.US, "⚡ %.1fW", finalWatt)
 
+        val speedTier = when {
+            finalWatt >= 45.0 -> "Hyper Charge"
+            finalWatt >= 25.0 -> "Turbo Charge"
+            finalWatt >= 15.0 -> "Fast Charge"
+            finalWatt > 0.0 -> "Standar"
+            else -> "Terhubung"
+        }
+
         return ChargingInfo(
             isCharging = true,
             watt = finalWatt,
@@ -165,25 +176,49 @@ class DeviceStatsProvider(context: Context) {
             currentMa = currentMa,
             pluggedType = pluggedType,
             tempTenths = tempTenths,
-            batteryLevel = batteryLevel
+            batteryLevel = batteryLevel,
+            chargeSpeedTier = speedTier
         )
     }
 
+    private var cachedSysfsPath: String? = null
+
+    private val candidatePaths = arrayOf(
+        "/sys/class/power_supply/battery/current_now",
+        "/sys/class/power_supply/bms/current_now",
+        "/sys/class/power_supply/battery/BatteryAverageCurrent",
+        "/sys/class/power_supply/battery/input_current_now",
+        "/sys/class/power_supply/usb/current_now",
+        "/sys/class/power_supply/main/current_now",
+        "/sys/class/power_supply/charger/current_now"
+    )
+
     /**
      * Pembacaan arus langsung dari driver power_supply kernel Linux.
+     * Menggunakan caching path untuk menghindari syscall berulang yang membebani CPU.
      */
     private fun readSysfsCurrent(): Long {
-        val candidatePaths = arrayOf(
-            "/sys/class/power_supply/battery/current_now",
-            "/sys/class/power_supply/bms/current_now",
-            "/sys/class/power_supply/battery/BatteryAverageCurrent"
-        )
+        cachedSysfsPath?.let { path ->
+            try {
+                val file = File(path)
+                if (file.canRead()) {
+                    val raw = file.readText().trim().toLongOrNull()
+                    if (raw != null && raw != 0L) {
+                        return abs(raw)
+                    }
+                }
+            } catch (_: Throwable) {
+                cachedSysfsPath = null
+            }
+        }
+
         for (path in candidatePaths) {
             try {
                 val file = File(path)
                 if (file.exists() && file.canRead()) {
                     val raw = file.readText().trim().toLongOrNull()
                     if (raw != null && raw != 0L) {
+                        cachedSysfsPath = path
                         return abs(raw)
                     }
                 }
