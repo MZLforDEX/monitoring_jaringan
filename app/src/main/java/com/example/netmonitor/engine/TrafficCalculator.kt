@@ -43,6 +43,17 @@ class TrafficCalculator {
         val currentRx = getTotalRxBytes()
         val currentTx = getTotalTxBytes()
 
+        // Periksa apakah perangkat mengembalikan TrafficStats.UNSUPPORTED (-1L)
+        if (currentRx < 0L || currentTx < 0L) {
+            isInitialized = false
+            return NetworkTrafficSnapshot(
+                rxSpeedBytes = 0L,
+                txSpeedBytes = 0L,
+                rxFormatted = formatSpeed(0L),
+                txFormatted = formatSpeed(0L)
+            )
+        }
+
         // Sampling pertama hanya mencatat basis referensi
         if (!isInitialized) {
             lastRxBytes = currentRx
@@ -61,16 +72,6 @@ class TrafficCalculator {
 
         // Abaikan kalkulasi jika delta waktu tidak valid
         if (deltaTimeMs <= 0L) {
-            return NetworkTrafficSnapshot(
-                rxSpeedBytes = 0L,
-                txSpeedBytes = 0L,
-                rxFormatted = formatSpeed(0L),
-                txFormatted = formatSpeed(0L)
-            )
-        }
-
-        // Periksa apakah perangkat mengembalikan TrafficStats.UNSUPPORTED (-1L)
-        if (currentRx < 0L || currentTx < 0L) {
             return NetworkTrafficSnapshot(
                 rxSpeedBytes = 0L,
                 txSpeedBytes = 0L,
@@ -118,6 +119,8 @@ class TrafficCalculator {
      */
     @Synchronized
     fun calculateDelta(currentRx: Long, currentTx: Long): Pair<Long, Long> {
+        if (currentRx < 0L || currentTx < 0L) return Pair(0L, 0L)
+
         if (!isInitialized) {
             lastRxBytes = currentRx
             lastTxBytes = currentTx

@@ -26,9 +26,12 @@
     <!-- 7. Izin Game Booster untuk membersihkan proses memori latar belakang non-esensial -->
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
 
-    <!-- 8. Package Visibility untuk Android 11+ (API 30+) agar dapat mendeteksi Shizuku Manager -->
+    <!-- 8. Package Visibility untuk Android 11+ (API 30+) agar dapat mendeteksi Shizuku & Aplikasi Terpasang -->
     <queries>
         <package android:name="moe.shizuku.privileged.api" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+        </intent>
     </queries>
 
     <application

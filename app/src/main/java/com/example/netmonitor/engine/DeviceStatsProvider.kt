@@ -27,7 +27,8 @@ class DeviceStatsProvider(context: Context) {
         val formattedWatt: String,
         val voltageVolts: Double,
         val currentMa: Int,
-        val pluggedType: String
+        val pluggedType: String,
+        val tempTenths: Int = 0
     )
 
     private val activityManager: ActivityManager =
@@ -54,7 +55,11 @@ class DeviceStatsProvider(context: Context) {
      * Membaca suhu baterai/perangkat dalam persepuluh derajat Celsius (misal: 365 = 36.5°C).
      */
     fun getBatteryTemperatureTenths(context: Context): Int {
-        val batteryStatus = context.registerReceiver(null, batteryFilter)
+        val batteryStatus = try {
+            context.registerReceiver(null, batteryFilter)
+        } catch (_: Exception) {
+            null
+        }
         return batteryStatus?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
     }
 
@@ -62,9 +67,14 @@ class DeviceStatsProvider(context: Context) {
      * Membaca informasi pengisian daya dan kecepatan Watt secara real-time.
      */
     fun getChargingInfo(context: Context): ChargingInfo {
-        val batteryStatus = context.registerReceiver(null, batteryFilter)
+        val batteryStatus = try {
+            context.registerReceiver(null, batteryFilter)
+        } catch (_: Exception) {
+            null
+        }
         val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
         val plugged = batteryStatus?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+        val tempTenths = batteryStatus?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
 
         val isCharging = plugged != 0 && (
             status == BatteryManager.BATTERY_STATUS_CHARGING ||
@@ -85,7 +95,8 @@ class DeviceStatsProvider(context: Context) {
                 formattedWatt = "",
                 voltageVolts = 0.0,
                 currentMa = 0,
-                pluggedType = pluggedType
+                pluggedType = pluggedType,
+                tempTenths = tempTenths
             )
         }
 
@@ -102,10 +113,12 @@ class DeviceStatsProvider(context: Context) {
         val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
 
         if (batteryManager != null) {
-            val currentNow = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW).toLong()
-            if (currentNow != 0L && currentNow != Long.MIN_VALUE && currentNow != Int.MIN_VALUE.toLong()) {
-                currentMicroAmps = abs(currentNow)
-            }
+            try {
+                val currentNow = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW).toLong()
+                if (currentNow != 0L && currentNow != Long.MIN_VALUE && currentNow != Int.MIN_VALUE.toLong() && currentNow != -1L) {
+                    currentMicroAmps = abs(currentNow)
+                }
+            } catch (_: Exception) {}
         }
 
         // Fallback pembacaan sysfs kernel jika API BatteryManager mengembalikan 0
@@ -113,17 +126,19 @@ class DeviceStatsProvider(context: Context) {
             currentMicroAmps = readSysfsCurrent()
         }
 
-        // Konversi arus: Chipset Android ada yang melaporkan dalam mA (< 25.000) atau uA (>= 25.000)
+        // Konversi arus: Sesuai standar Android CDD (Section 7.3.6), nilai dilaporkan dalam microamperes (uA).
         val currentAmperes: Double
         val currentMa: Int
-        if (currentMicroAmps >= 25000L) {
-            // Nilai dalam mikroampere (uA)
-            currentAmperes = currentMicroAmps / 1000000.0
-            currentMa = (currentMicroAmps / 1000L).toInt()
-        } else if (currentMicroAmps > 0L) {
-            // Nilai dalam miliampere (mA)
-            currentAmperes = currentMicroAmps / 1000.0
-            currentMa = currentMicroAmps.toInt()
+        if (currentMicroAmps > 0L) {
+            if (currentMicroAmps in 1L..2500L && plugged == BatteryManager.BATTERY_PLUGGED_AC) {
+                // Fallback untuk driver vendor lawas yang melaporkan arus langsung dalam mA
+                currentAmperes = currentMicroAmps / 1000.0
+                currentMa = currentMicroAmps.toInt()
+            } else {
+                // Standar microampere (uA): 1.500.000 uA = 1.5A, 15.000 uA (trickle) = 0.015A (15mA)
+                currentAmperes = currentMicroAmps / 1000000.0
+                currentMa = (currentMicroAmps / 1000L).toInt()
+            }
         } else {
             // Estimasi fallback aman untuk standar charger jika driver sensor diblokir vendor OS
             currentAmperes = if (plugged == BatteryManager.BATTERY_PLUGGED_AC) 2.0 else 0.5
@@ -132,8 +147,8 @@ class DeviceStatsProvider(context: Context) {
 
         // 3. Perhitungan Daya (Watt = Volt x Ampere)
         val calculatedWatt = voltageVolts * currentAmperes
-        // Batasi rentang realistis daya ponsel (0.5W s/d 240W)
-        val finalWatt = calculatedWatt.coerceIn(0.5, 240.0)
+        // Batasi rentang realistis daya ponsel (0.0W s/d 240W)
+        val finalWatt = calculatedWatt.coerceIn(0.0, 240.0)
 
         val formattedWatt = String.format(Locale.US, "⚡ %.1fW", finalWatt)
 
@@ -143,7 +158,8 @@ class DeviceStatsProvider(context: Context) {
             formattedWatt = formattedWatt,
             voltageVolts = voltageVolts,
             currentMa = currentMa,
-            pluggedType = pluggedType
+            pluggedType = pluggedType,
+            tempTenths = tempTenths
         )
     }
 

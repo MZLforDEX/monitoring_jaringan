@@ -63,6 +63,7 @@ class FloatingWindowManager(private val context: Context) {
 
     private var isViewAttached: Boolean = false
 
+    @Volatile
     private var currentConfig: MonitorConfig = MonitorConfig.load(context)
 
     // Listener saat tombol Quick Boost di floating HUD diketuk pengguna
@@ -133,8 +134,7 @@ class FloatingWindowManager(private val context: Context) {
             isViewAttached = true
             return true
         } catch (_: Exception) {
-            isViewAttached = false
-            floatingView = null
+            clearViewReferences()
             return false
         }
     }
@@ -254,6 +254,36 @@ class FloatingWindowManager(private val context: Context) {
         destroy()
     }
 
+    private fun clearViewReferences() {
+        floatingView?.setOnTouchListener(null)
+        floatingView = null
+        rootFloatingPill = null
+        tvDownload = null
+        tvUpload = null
+        tvPing = null
+        tvFps = null
+        tvRam = null
+        tvTemp = null
+        tvWatt = null
+        btnQuickBoost = null
+        sepDownload = null
+        sepUpload = null
+        sepPing = null
+        sepFps = null
+        sepRam = null
+        sepTemp = null
+        sepBoost = null
+        isViewAttached = false
+        onQuickBoostListener = null
+        lastDownText = ""
+        lastUpText = ""
+        lastPingText = ""
+        lastFpsText = ""
+        lastRamText = ""
+        lastTempText = ""
+        lastWattText = ""
+    }
+
     /**
      * Menghapus view dari WindowManager dan membersihkan referensi untuk mencegah kebocoran memori.
      */
@@ -269,35 +299,9 @@ class FloatingWindowManager(private val context: Context) {
                 // Supresi jika view sudah terlepas
             } catch (_: Exception) {
                 // Pengaman umum pelepasan view
-            } finally {
-                view.setOnTouchListener(null)
-                floatingView = null
-                rootFloatingPill = null
-                tvDownload = null
-                tvUpload = null
-                tvPing = null
-                tvFps = null
-                tvRam = null
-                tvTemp = null
-                tvWatt = null
-                btnQuickBoost = null
-                sepDownload = null
-                sepUpload = null
-                sepPing = null
-                sepFps = null
-                sepRam = null
-                sepTemp = null
-                sepBoost = null
-                isViewAttached = false
-                lastDownText = ""
-                lastUpText = ""
-                lastPingText = ""
-                lastFpsText = ""
-                lastRamText = ""
-                lastTempText = ""
-                lastWattText = ""
             }
         }
+        clearViewReferences()
     }
 
     /**
@@ -336,15 +340,20 @@ class FloatingWindowManager(private val context: Context) {
                         }
 
                         if (isDragging) {
-                            val newX = initialX + deltaX
-                            val newY = initialY + deltaY
+                            val dm = context.resources.displayMetrics
+                            val maxX = (dm.widthPixels - (currentFloatingView.width.takeIf { it > 0 } ?: 200)).coerceAtLeast(0)
+                            val maxY = (dm.heightPixels - (currentFloatingView.height.takeIf { it > 0 } ?: 80)).coerceAtLeast(0)
+                            val newX = (initialX + deltaX).coerceIn(0, maxX)
+                            val newY = (initialY + deltaY).coerceIn(0, maxY)
 
                             if (newX != layoutParams.x || newY != layoutParams.y) {
                                 layoutParams.x = newX
                                 layoutParams.y = newY
 
                                 if (isViewAttached && currentFloatingView.isAttachedToWindow) {
-                                    windowManager.updateViewLayout(currentFloatingView, layoutParams)
+                                    try {
+                                        windowManager.updateViewLayout(currentFloatingView, layoutParams)
+                                    } catch (_: Exception) {}
                                 }
                             }
                         }
@@ -466,16 +475,30 @@ class FloatingWindowManager(private val context: Context) {
                         tvWatt?.text = wattText
                         lastWattText = wattText
                     }
-                    val hasBeforeWatt = currentConfig.showDownload || currentConfig.showUpload || currentConfig.showPing || currentConfig.showFps || currentConfig.showRam || currentConfig.showTemp
-                    sepTemp?.visibility = if (hasBeforeWatt) View.VISIBLE else View.GONE
                 } else {
                     if (tvWatt?.visibility != View.GONE) {
                         tvWatt?.visibility = View.GONE
                     }
-                    if (sepTemp?.visibility != View.GONE) {
-                        sepTemp?.visibility = View.GONE
-                    }
                 }
+
+                // Pengaturan pemisah (separators) agar tidak terjadi double divider vertikal
+                val hasAfterTemp = shouldShowWatt || currentConfig.showQuickBoost
+                sepTemp?.visibility = if (currentConfig.showTemp && hasAfterTemp) View.VISIBLE else View.GONE
+
+                val hasAfterRam = currentConfig.showTemp || shouldShowWatt || currentConfig.showQuickBoost
+                sepRam?.visibility = if (currentConfig.showRam && hasAfterRam) View.VISIBLE else View.GONE
+
+                val hasAfterFps = currentConfig.showRam || currentConfig.showTemp || shouldShowWatt || currentConfig.showQuickBoost
+                sepFps?.visibility = if (currentConfig.showFps && hasAfterFps) View.VISIBLE else View.GONE
+
+                val hasAfterPing = currentConfig.showFps || currentConfig.showRam || currentConfig.showTemp || shouldShowWatt || currentConfig.showQuickBoost
+                sepPing?.visibility = if (currentConfig.showPing && hasAfterPing) View.VISIBLE else View.GONE
+
+                val hasAfterUp = currentConfig.showPing || currentConfig.showFps || currentConfig.showRam || currentConfig.showTemp || shouldShowWatt || currentConfig.showQuickBoost
+                sepUpload?.visibility = if (currentConfig.showUpload && hasAfterUp) View.VISIBLE else View.GONE
+
+                val hasAfterDown = currentConfig.showUpload || currentConfig.showPing || currentConfig.showFps || currentConfig.showRam || currentConfig.showTemp || shouldShowWatt || currentConfig.showQuickBoost
+                sepDownload?.visibility = if (currentConfig.showDownload && hasAfterDown) View.VISIBLE else View.GONE
 
                 // Separator tombol Quick Boost
                 if (currentConfig.showQuickBoost) {

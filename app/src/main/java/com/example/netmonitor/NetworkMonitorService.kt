@@ -126,6 +126,8 @@ class NetworkMonitorService : Service() {
 
         val isOverlayShown = floatingWindowManager.show()
         if (!isOverlayShown) {
+            isServiceRunning = false
+            activeInstance = null
             stopSelf()
             return
         }
@@ -306,15 +308,15 @@ class NetworkMonitorService : Service() {
                     deviceStatsProvider.getRamUsagePercent()
                 } else 0
 
-                // Komputasi Suhu (hanya jika aktif)
-                val tempTenths = if (config.showTemp) {
-                    deviceStatsProvider.getBatteryTemperatureTenths(this@NetworkMonitorService)
-                } else 0
-
                 // Komputasi Daya Pengisian Baterai / Watt (hanya jika aktif)
                 val chargingInfo = if (config.showWatt) {
                     deviceStatsProvider.getChargingInfo(this@NetworkMonitorService)
                 } else null
+
+                // Komputasi Suhu (gunakan snapshot charging jika sudah dibaca untuk menghemat IPC)
+                val tempTenths = if (config.showTemp) {
+                    chargingInfo?.tempTenths ?: deviceStatsProvider.getBatteryTemperatureTenths(this@NetworkMonitorService)
+                } else 0
 
                 // Publikasikan ke UI overlay
                 withContext(Dispatchers.Main) {
@@ -362,6 +364,7 @@ class NetworkMonitorService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         pauseMonitoring()
+        fpsProvider.destroy()
         serviceScope.cancel()
 
         unregisterScreenReceiver()

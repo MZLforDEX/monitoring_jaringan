@@ -118,14 +118,20 @@ object GameBooster {
         // 2. Jika Shizuku aktif dan diizinkan, jalankan am kill-all & cache trim tingkat kernel
         if (ShizukuManager.hasPermission()) {
             try {
-                val procKill = ShizukuManager.execute(arrayOf("sh", "-c", "am kill-all"))
+                val procKill = ShizukuManager.execute(arrayOf("am", "kill-all"))
                 procKill?.waitFor(250, TimeUnit.MILLISECONDS)
+                try { procKill?.outputStream?.close() } catch (_: Throwable) {}
+                try { procKill?.inputStream?.close() } catch (_: Throwable) {}
+                try { procKill?.errorStream?.close() } catch (_: Throwable) {}
                 procKill?.destroy()
             } catch (_: Throwable) {}
 
             try {
-                val procTrim = ShizukuManager.execute(arrayOf("sh", "-c", "pm trim-caches 256M"))
+                val procTrim = ShizukuManager.execute(arrayOf("pm", "trim-caches", "256M"))
                 procTrim?.waitFor(250, TimeUnit.MILLISECONDS)
+                try { procTrim?.outputStream?.close() } catch (_: Throwable) {}
+                try { procTrim?.inputStream?.close() } catch (_: Throwable) {}
+                try { procTrim?.errorStream?.close() } catch (_: Throwable) {}
                 procTrim?.destroy()
             } catch (_: Throwable) {}
         }
@@ -152,16 +158,19 @@ object GameBooster {
         // Jika OS langsung mengalokasikan ulang buffer cache, gunakan estimasi realistis berdasarkan proses yang ditrim
         val effectiveFreedBytes = if (actualDeltaBytes > 0L) {
             actualDeltaBytes
+        } else if (killedCount > 0) {
+            (killedCount * 28L * 1024L * 1024L).coerceIn(28L * 1024L * 1024L, 550L * 1024L * 1024L)
         } else {
-            val estimatedBytes = (killedCount.coerceAtLeast(3) * 28L * 1024L * 1024L).coerceIn(120L * 1024L * 1024L, 550L * 1024L * 1024L)
-            estimatedBytes
+            0L
         }
 
         val freedMb = (effectiveFreedBytes / (1024L * 1024L)).toInt()
         val afterPercent = if (statsAfter.usedPercent < statsBefore.usedPercent) {
             statsAfter.usedPercent
-        } else {
+        } else if (freedMb > 0) {
             (statsBefore.usedPercent - ((freedMb * 100) / statsBefore.totalMb.coerceAtLeast(1L)).toInt()).coerceAtLeast(10)
+        } else {
+            statsBefore.usedPercent
         }
 
         val duration = SystemClock.elapsedRealtime() - startTime

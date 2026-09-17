@@ -17,6 +17,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -224,6 +225,16 @@ class FpsProvider(private val context: Context) {
         lastGfxPkg = null
         cachedFocusedPkg = null
         lastFocusedPkg = null
+    }
+
+    /**
+     * Membersihkan seluruh resource dan membatalkan coroutine scope.
+     */
+    fun destroy() {
+        stopMonitoring()
+        try {
+            samplerScope.cancel()
+        } catch (_: Exception) {}
     }
 
     /**
@@ -452,11 +463,13 @@ class FpsProvider(private val context: Context) {
             readerThread.join(timeoutMs)
 
             if (readerThread.isAlive) {
+                try { proc.inputStream.close() } catch (_: Exception) {}
                 readerThread.interrupt()
                 proc.destroy()
                 return null
             }
 
+            try { proc.inputStream.close() } catch (_: Exception) {}
             proc.destroy()
             output
         } catch (_: Exception) {

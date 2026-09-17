@@ -515,8 +515,7 @@ class MainActivity : ComponentActivity() {
         val hasAfterRam = config.showTemp || config.showWatt || config.showQuickBoost
         previewSepRam.visibility = if (config.showRam && hasAfterRam) View.VISIBLE else View.GONE
 
-        val hasBeforeWatt = config.showDownload || config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp
-        previewSepTemp.visibility = if (config.showWatt && hasBeforeWatt) View.VISIBLE else View.GONE
+        previewSepTemp.visibility = if (config.showTemp && (config.showWatt || config.showQuickBoost)) View.VISIBLE else View.GONE
 
         val hasAnyBeforeBoost = config.showDownload || config.showUpload || config.showPing || config.showFps || config.showRam || config.showTemp || config.showWatt
         previewSepBoost.visibility = if (config.showQuickBoost && hasAnyBeforeBoost) View.VISIBLE else View.GONE
@@ -620,7 +619,7 @@ class MainActivity : ComponentActivity() {
         btnGameBoost.text = "⚡ Mengoptimalkan Memori & Game..."
 
         mainScope.launch {
-            val result = GameBooster.boost(this@MainActivity)
+            val result = GameBooster.boost(this@MainActivity.applicationContext)
 
             updateRamDisplay()
 
@@ -713,6 +712,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateUiState() {
+        if (isFinishing || isDestroyed) return
+
         val hasOverlay = hasOverlayPermission()
         val hasNotification = hasNotificationPermission()
         val isRunning = NetworkMonitorService.isServiceRunning
